@@ -22,11 +22,16 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+*.pyc
+*.pyo
+*.pyd
+.Python
 
 # Environment
 .env
 .env.local
 .env.*.local
+*.env
 
 # IDE
 .vscode/
@@ -34,25 +39,159 @@ wheels/
 *.swp
 *.swo
 *~
+*.sublime-project
+*.sublime-workspace
 
 # OS
 .DS_Store
 Thumbs.db
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Desktop.ini
 
 # Frontend
 frontend/node_modules/
 frontend/dist/
+frontend/dist-ssr/
 frontend/.vite/
+frontend/.next/
+frontend/out/
+frontend/.nuxt/
+frontend/.cache/
+frontend/.parcel-cache/
+frontend/.turbo/
+frontend/.vercel/
+frontend/.svelte-kit/
+frontend/build/
+frontend/.output/
+
+# TypeScript
+*.tsbuildinfo
+*.tsbuildinfo.*
 
 # Logs
 *.log
 logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 
 # MLflow
 mlruns/
+notebooks/mlruns/
+
+# Model files and artifacts
 *.pkl
+*.pickle
+*.joblib
+*.h5
+*.hdf5
+*.pb
+*.onnx
+*.pt
+*.pth
+*.ckpt
+
+# Keep important processor files (exception to *.pkl rule)
+!notebooks/processors/
+!notebooks/processors/*.pkl
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+notebooks/.ipynb_checkpoints/
+
+# CatBoost temporary files
+catboost_info/
+notebooks/catboost_info/
+*.catboost
+
+# Model artifacts in notebooks (trained models)
+notebooks/*.pkl
+notebooks/*_baseline.pkl
+notebooks/*_tuned.pkl
+notebooks/*_ensemble.pkl
+notebooks/trained_models/
 
 # Testing
 .pytest_cache/
 .coverage
 htmlcov/
+.tox/
+.nox/
+testing/reports/
+*.cover
+.hypothesis/
+coverage.xml
+*.py,cover
+.cache
+nosetests.xml
+
+# Data files (uncomment if you want to ignore large data files)
+# data/*.csv
+# data/*.parquet
+# data/*.feather
+# data/*.h5
+# data/*.hdf5
+
+# Docker
+.dockerignore
+docker-compose.override.yml
+*.dockerignore
+
+# Build artifacts
+*.egg-info/
+build/
+dist/
+*.whl
+*.tar.gz
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+*.swp
+*~
+.tmp/
+temp/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Secrets and credentials
+secrets/
+credentials/
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# MacOS
+.AppleDouble
+.LSOverride
+Icon
+
+# Windows
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
