@@ -48,12 +48,19 @@ pipeline {
 
                         // Installer les dépendances
                         bat """
-                            venv\\Scripts\\python.exe -m pip install --upgrade pip
-                            venv\\Scripts\\pip.exe install -r monitoring/requirements.txt
-                            venv\\Scripts\\pip.exe list
+                            venv\\Scripts\\python.exe -m pip install --upgrade pip setuptools wheel
+                            venv\\Scripts\\python.exe -m pip install -r monitoring/requirements.txt
+                            echo "--- PIP LIST (Diagnostic) ---"
+                            venv\\Scripts\\python.exe -m pip list
                         """
                         echo '✅ Dépendances vérifiées'
                         
+                        // Diagnostic import
+                        bat """
+                            echo "--- IMPORT TEST (Diagnostic) ---"
+                            venv\\Scripts\\python.exe -c "import sys; print(f'Python: {sys.executable}'); print(sys.path); import evidently; print(f'Evidently version: {evidently.__version__}')"
+                        """
+
                         // Générer les données de production
                         bat """
                             venv\\Scripts\\python.exe scripts/generate_prod_data.py
