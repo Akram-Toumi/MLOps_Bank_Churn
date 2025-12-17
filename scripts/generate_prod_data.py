@@ -11,7 +11,7 @@ INPUT_FILE = "data/churn.csv"  # Fichier avec 30000 lignes
 OUTPUT_FILE = "data/production/bank_churn_prod.csv"
 START_ROW = 20000
 END_ROW = 30000
-DRIFT_INTENSITY = 0.15
+DRIFT_INTENSITY = 0.3  # 30% drift pour être sûr qu'il soit détecté
 
 print("=" * 80)
 print("GÉNÉRATION DES DONNÉES DE PRODUCTION")

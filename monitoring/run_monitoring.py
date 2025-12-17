@@ -58,17 +58,16 @@ print(f"✅ Données de référence: {df_reference.shape[0]:,} lignes")
 df_production = pd.read_csv(PRODUCTION_DATA)
 print(f"✅ Données de production: {df_production.shape[0]:,} lignes")
 
-# Sélectionner les colonnes numériques communes
-numeric_cols = df_reference.select_dtypes(include=['int64', 'float64']).columns.tolist()
-common_cols = [col for col in numeric_cols if col in df_production.columns]
+# Sélectionner les colonnes communes (toutes, pas seulement numériques)
+common_cols = [col for col in df_reference.columns if col in df_production.columns]
 
-# Limiter aux colonnes importantes pour le drift
-important_cols = ['Balance', 'Income', 'Credit Score', 'CreditScore', 'NumOfProducts', 
-                  'Customer Tenure', 'CustomerTenure', 'Outstanding Loans', 'OutstandingLoans']
-drift_cols = [col for col in common_cols if any(imp in col for imp in important_cols)]
+# Exclure les colonnes ID et target
+exclude_cols = ['id', 'ID', 'customer_id', 'Customer ID', 'Churn', 'Churn Flag']
+drift_cols = [col for col in common_cols if col not in exclude_cols]
 
 print(f"📊 Colonnes analysées pour le drift: {len(drift_cols)}")
-print(f"   {drift_cols[:5]}...")
+print(f"   {drift_cols[:10]}")
+print(f"   Colonnes exclues: {[c for c in exclude_cols if c in common_cols]}")
 
 # ============================================================================
 # GÉNÉRATION DU RAPPORT EVIDENTLY
