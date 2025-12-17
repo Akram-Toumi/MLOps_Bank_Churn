@@ -118,7 +118,8 @@ try:
         if 'DatasetDriftMetric' in str(metric.get('metric', '')):
             result = metric.get('result', {})
             metrics['drift_score'] = result.get('dataset_drift_score', 0.0)
-            metrics['drift_detected'] = result.get('dataset_drift', False)
+            # NE PAS utiliser dataset_drift d'Evidently, calculer nous-mêmes
+            # metrics['drift_detected'] = result.get('dataset_drift', False)
             
             # Colonnes avec drift
             drift_by_columns = result.get('drift_by_columns', {})
@@ -132,6 +133,12 @@ except Exception as e:
     print(f"   Rapport dict keys: {list(report_dict.keys())}")
     # Ne pas forcer drift_detected à True, garder False par défaut
     print("   Utilisation des valeurs par défaut (pas de drift)")
+
+# Calculer drift_detected basé sur le score ET les colonnes
+metrics['drift_detected'] = (
+    metrics['drift_score'] > DRIFT_THRESHOLD or 
+    len(metrics['drifted_columns']) > 0
+)
 
 # Sauvegarder les métriques en JSON
 with open(OUTPUT_JSON, 'w') as f:
