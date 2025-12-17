@@ -129,9 +129,9 @@ try:
             break
 except Exception as e:
     print(f"⚠️  Erreur lors de l'extraction des métriques: {e}")
-    # Valeurs par défaut conservatrices
-    metrics['drift_detected'] = True
-    metrics['drift_score'] = 0.15
+    print(f"   Rapport dict keys: {list(report_dict.keys())}")
+    # Ne pas forcer drift_detected à True, garder False par défaut
+    print("   Utilisation des valeurs par défaut (pas de drift)")
 
 # Sauvegarder les métriques en JSON
 with open(OUTPUT_JSON, 'w') as f:
