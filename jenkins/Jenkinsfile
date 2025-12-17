@@ -1,0 +1,197 @@
+// Jenkinsfile pour le pipeline MLOps
+// Pipeline CI/CD avec monitoring, data drift detection et DVC versioning
+
+pipeline {
+    agent any
+    
+    // Variables d'environnement
+    environment {
+        PROJECT_DIR = "${WORKSPACE}"
+        PYTHON_ENV = "${PROJECT_DIR}/.venv/Scripts/python.exe"
+        DRIFT_THRESHOLD = "0.1"
+    }
+    
+    // Déclenchement automatique
+    triggers {
+        // Exécution quotidienne à 2h du matin
+        cron('0 2 * * *')
+    }
+    
+    stages {
+        // ====================================================================
+        // STAGE 1: MONITORING - Exécution du script de monitoring
+        // ====================================================================
+        stage('Data Drift Monitoring') {
+            steps {
+                echo '🔍 Exécution du monitoring Evidently...'
+                
+                script {
+                    try {
+                        // Exécuter le script de monitoring
+                        bat """
+                            ${PYTHON_ENV} monitoring/run_monitoring.py
+                        """
+                        echo '✅ Monitoring terminé avec succès'
+                    } catch (Exception e) {
+                        echo "⚠️  Erreur lors du monitoring: ${e.message}"
+                        currentBuild.result = 'UNSTABLE'
+                    }
+                }
+            }
+            
+            post {
+                always {
+                    // Archiver les rapports générés
+                    archiveArtifacts artifacts: 'monitoring/*.html, monitoring/*.json', 
+                                   allowEmptyArchive: true
+                    
+                    // Publier le rapport HTML
+                    publishHTML([
+                        allowMissing: false,
+                        alwaysLinkToLastBuild: true,
+                        keepAll: true,
+                        reportDir: 'monitoring',
+                        reportFiles: 'monitoring_report.html',
+                        reportName: 'Evidently Data Drift Report'
+                    ])
+                }
+            }
+        }
+        
+        // ====================================================================
+        // STAGE 2: CHECK DRIFT - Vérifier si un drift a été détecté
+        // ====================================================================
+        stage('Check Data Drift') {
+            steps {
+                echo '📊 Vérification du data drift...'
+                
+                script {
+                    // Vérifier l'existence du fichier trigger
+                    def triggerExists = fileExists('trigger.txt')
+                    
+                    if (triggerExists) {
+                        echo '🚨 DATA DRIFT DETECTED!'
+                        
+                        // Lire le contenu du trigger
+                        def triggerContent = readFile('trigger.txt')
+                        echo "Détails du drift:\n${triggerContent}"
+                        
+                        // Marquer le build comme instable
+                        currentBuild.result = 'UNSTABLE'
+                        
+                        // Définir une variable pour les stages suivants
+                        env.DRIFT_DETECTED = 'true'
+                    } else {
+                        echo '✅ Aucun drift détecté - Modèle stable'
+                        env.DRIFT_DETECTED = 'false'
+                    }
+                }
+            }
+        }
+        
+        // ====================================================================
+        // STAGE 3: DVC VERSIONING - Versionner si drift détecté
+        // ====================================================================
+        stage('DVC Versioning') {
+            when {
+                expression { env.DRIFT_DETECTED == 'true' }
+            }
+            
+            steps {
+                echo '📦 Versioning avec DVC...'
+                
+                script {
+                    try {
+                        // Initialiser DVC si nécessaire
+                        bat """
+                            dvc init --force || echo "DVC déjà initialisé"
+                        """
+                        
+                        // Ajouter les données de production
+                        bat """
+                            dvc add data/production/bank_churn_prod.csv
+                        """
+                        
+                        // Commit DVC
+                        bat """
+                            git add data/production/bank_churn_prod.csv.dvc .dvc/config
+                            git commit -m "DVC: Version production data after drift detection" || echo "Rien à commiter"
+                        """
+                        
+                        // Push DVC (vers remote local)
+                        bat """
+                            dvc push || echo "DVC push échoué - vérifier la configuration du remote"
+                        """
+                        
+                        echo '✅ Versioning DVC terminé'
+                    } catch (Exception e) {
+                        echo "⚠️  Erreur DVC: ${e.message}"
+                        echo "Note: DVC nécessite une configuration préalable"
+                    }
+                }
+            }
+        }
+        
+        // ====================================================================
+        // STAGE 4: NOTIFICATION - Envoyer des alertes
+        // ====================================================================
+        stage('Notification') {
+            steps {
+                echo '📧 Envoi des notifications...'
+                
+                script {
+                    if (env.DRIFT_DETECTED == 'true') {
+                        // Notification de drift détecté
+                        echo """
+                        ╔════════════════════════════════════════╗
+                        ║   🚨 DATA DRIFT ALERT 🚨              ║
+                        ╠════════════════════════════════════════╣
+                        ║ Un drift significatif a été détecté   ║
+                        ║ dans les données de production.       ║
+                        ║                                        ║
+                        ║ Actions recommandées:                  ║
+                        ║ 1. Consulter le rapport Evidently     ║
+                        ║ 2. Analyser les colonnes avec drift   ║
+                        ║ 3. Considérer le réentraînement       ║
+                        ║ 4. Vérifier le versioning DVC         ║
+                        ╚════════════════════════════════════════╝
+                        """
+                        
+                        // Dans un environnement réel, envoyer un email/Slack
+                        // emailext subject: "Data Drift Detected",
+                        //          body: readFile('trigger.txt'),
+                        //          to: "data-team@company.com"
+                    } else {
+                        echo '✅ Système stable - Aucune action requise'
+                    }
+                }
+            }
+        }
+    }
+    
+    // ====================================================================
+    // POST-BUILD ACTIONS
+    // ====================================================================
+    post {
+        success {
+            echo '✅ Pipeline terminé avec succès'
+        }
+        
+        unstable {
+            echo '⚠️  Pipeline terminé avec warnings (drift détecté)'
+        }
+        
+        failure {
+            echo '❌ Pipeline échoué'
+        }
+        
+        always {
+            // Nettoyer les fichiers temporaires
+            echo '🧹 Nettoyage...'
+            
+            // Archiver les logs
+            archiveArtifacts artifacts: 'trigger.txt', 
+                           allowEmptyArchive: true
+        }
+    }
+}
