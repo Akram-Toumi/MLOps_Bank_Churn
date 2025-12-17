@@ -46,20 +46,19 @@ pipeline {
                             copy "C:\\Users\\Tech House\\Desktop\\3eme\\mlops\\mlops\\MLOps_Bank_Churn\\data\\churn.csv" "data\\churn.csv"
                         """
 
-                        // Installer les dépendances
+                        // Installer les dépendances avec vérification explicite
                         bat """
+                            echo "=== INSTALLATION DES DEPENDANCES ==="
                             venv\\Scripts\\python.exe -m pip install --upgrade pip setuptools wheel
-                            venv\\Scripts\\python.exe -m pip install -r monitoring/requirements.txt
-                            echo "--- PIP LIST (Diagnostic) ---"
-                            venv\\Scripts\\python.exe -m pip list
+                            venv\\Scripts\\python.exe -m pip install --no-cache-dir evidently pandas numpy
+                            echo ""
+                            echo "=== VERIFICATION INSTALLATION ==="
+                            venv\\Scripts\\python.exe -m pip show evidently
+                            echo ""
+                            echo "=== TEST IMPORT EVIDENTLY ==="
+                            venv\\Scripts\\python.exe -c "import evidently; print(f'✅ Evidently {evidently.__version__} installé'); from evidently.report import Report; print('✅ Report importé')"
                         """
                         echo '✅ Dépendances vérifiées'
-                        
-                        // Diagnostic import
-                        bat """
-                            echo "--- IMPORT TEST (Diagnostic) ---"
-                            venv\\Scripts\\python.exe -c "import sys; print(f'Python: {sys.executable}'); print(sys.path); import evidently; print(f'Evidently version: {evidently.__version__}')"
-                        """
 
                         // Générer les données de production
                         bat """
