@@ -1,0 +1,21 @@
+{
+    "CreditScore": 650,
+    "Geography": "France",
+    "Gender": "Female",
+    "Age": 42,
+    "Balance": 125000.0,
+    "NumOfProducts": 2,
+    "HasCrCard": 1,
+    "IsActiveMember": 1,
+    "CustomerTenure": 24,
+    "Income": 85000.0,
+    "OutstandingLoans": 15000.0,
+    "EstimatedSalary": 85000.0,
+    "NumberOfDependents": 2,
+    "Occupation": "Engineer",
+    "MaritalStatus": "Married",
+    "EducationLevel": "Bachelor",
+    "CustomerSegment": "Premium",
+    "PreferredCommunicationChannel": "Email",
+    "NumComplaints": 0
+}
