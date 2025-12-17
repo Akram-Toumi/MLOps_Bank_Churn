@@ -9,6 +9,7 @@ pipeline {
         PROJECT_DIR = "${WORKSPACE}"
         PYTHON_ENV = "c:/Users/Tech House/AppData/Local/Programs/Python/Python312/python.exe"
         DRIFT_THRESHOLD = "0.1"
+        PYTHONUTF8 = "1" // Force UTF-8 encoding for Python
     }
     
     // Déclenchement automatique
@@ -27,17 +28,24 @@ pipeline {
                 
                 script {
                     try {
-                        // Créer un environnement virtuel
+                        // Optimisation: Créer venv seulement s'il n'existe pas
+                        // Note: sur Windows, la vérification de dossier en batch est spécifique
                         bat """
-                            "${PYTHON_ENV}" -m venv venv
+                            if not exist venv (
+                                echo "Création du venv..."
+                                "${PYTHON_ENV}" -m venv venv
+                            ) else (
+                                echo "Le venv existe déjà."
+                            )
                         """
 
-                        // Installer les dépendances dans le venv
+                        // Installer les dépendances
                         bat """
                             venv\\Scripts\\python.exe -m pip install --upgrade pip
-                            venv\\Scripts\\pip.exe install evidently pandas numpy
+                            venv\\Scripts\\pip.exe install -r monitoring/requirements.txt
+                            venv\\Scripts\\pip.exe list
                         """
-                        echo '✅ Dépendances installées'
+                        echo '✅ Dépendances vérifiées'
                         
                         // Générer les données de production
                         bat """
