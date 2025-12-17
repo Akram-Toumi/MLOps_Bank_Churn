@@ -1,0 +1,310 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  background: radial-gradient(circle at top left, #020617, #020617 55%);
+  color: #e5e7eb;
+}
+
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-header {
+  padding: 2.5rem 1.5rem 1.5rem;
+  text-align: center;
+  position: relative;
+}
+
+.app-header::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at top center, #0ea5e9 0, transparent 60%);
+  opacity: 0.18;
+  mix-blend-mode: screen;
+}
+
+.app-header h1 {
+  margin: 0 0 0.5rem;
+  font-size: 2.6rem;
+  letter-spacing: 0.04em;
+}
+
+.subtitle {
+  margin: 0;
+  color: #9ca3af;
+  font-size: 0.98rem;
+}
+
+.app-main {
+  flex: 1;
+  padding: 0 1.5rem 2.5rem;
+  max-width: 1180px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 2.1fr) minmax(0, 1.2fr);
+  gap: 1.75rem;
+}
+
+@media (max-width: 960px) {
+  .app-main {
+    display: flex;
+    flex-direction: column;
+    padding-inline: 1rem;
+  }
+}
+
+.card {
+  background: linear-gradient(135deg, #020617, #020617 45%, #020617 100%);
+  border-radius: 1.25rem;
+  padding: 1.75rem 1.75rem 1.5rem;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  position: relative;
+  overflow: hidden;
+}
+
+.card::before {
+  content: "";
+  position: absolute;
+  inset: -40%;
+  background: radial-gradient(circle at top left, rgba(56, 189, 248, 0.08), transparent 55%);
+  opacity: 0.9;
+  pointer-events: none;
+}
+
+.card h2 {
+  margin-top: 0;
+  margin-bottom: 0.8rem;
+  font-size: 1.35rem;
+}
+
+.card p {
+  margin: 0.25rem 0 0.75rem;
+  color: #d1d5db;
+}
+
+.card ul {
+  padding-left: 1.2rem;
+  margin: 0.5rem 0 0;
+  color: #d1d5db;
+}
+
+.card li + li {
+  margin-top: 0.3rem;
+}
+
+code {
+  background-color: rgba(15, 23, 42, 0.9);
+  padding: 0.15rem 0.35rem;
+  border-radius: 0.35rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+  font-size: 0.9em;
+  color: #a5b4fc;
+}
+
+.form {
+  margin-top: 0.8rem;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 1.1rem 1.3rem;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.86rem;
+  color: #e5e7eb;
+}
+
+input,
+select {
+  border-radius: 0.6rem;
+  border: 1px solid rgba(148, 163, 184, 0.6);
+  padding: 0.55rem 0.7rem;
+  background-color: rgba(15, 23, 42, 0.85);
+  color: #f9fafb;
+  font-size: 0.86rem;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease,
+    background-color 0.15s ease;
+}
+
+input::placeholder {
+  color: #6b7280;
+}
+
+input:focus,
+select:focus {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.4);
+  background-color: rgba(15, 23, 42, 0.95);
+}
+
+.primary-btn {
+  margin-top: 1.25rem;
+  padding: 0.75rem 1.4rem;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(135deg, #0ea5e9, #6366f1);
+  color: white;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  box-shadow: 0 18px 35px rgba(37, 99, 235, 0.45);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+}
+
+.primary-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 22px 45px rgba(37, 99, 235, 0.6);
+  filter: brightness(1.05);
+}
+
+.primary-btn:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 12px 25px rgba(37, 99, 235, 0.4);
+}
+
+.primary-btn:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+
+.error-text {
+  margin-top: 0.95rem;
+  font-size: 0.86rem;
+  color: #fca5a5;
+}
+
+.card--form {
+  z-index: 1;
+}
+
+.card--summary {
+  z-index: 1;
+}
+
+.summary-header {
+  margin-bottom: 1.1rem;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  font-size: 0.78rem;
+  color: #e5e7eb;
+}
+
+.pill--muted {
+  border-color: rgba(148, 163, 184, 0.4);
+  color: #9ca3af;
+}
+
+.pill-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #22c55e;
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.25);
+}
+
+.pill-dot--muted {
+  background: #6b7280;
+  box-shadow: none;
+}
+
+.pill-text {
+  white-space: nowrap;
+}
+
+.chips-row {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.badge {
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.badge--high {
+  background: rgba(248, 113, 113, 0.18);
+  color: #fecaca;
+  border: 1px solid rgba(248, 113, 113, 0.6);
+}
+
+.badge--low {
+  background: rgba(34, 197, 94, 0.16);
+  color: #bbf7d0;
+  border: 1px solid rgba(34, 197, 94, 0.6);
+}
+
+.probability-section {
+  margin-bottom: 1.1rem;
+}
+
+.probability-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.86rem;
+  color: #e5e7eb;
+  margin-bottom: 0.4rem;
+}
+
+.probability-value {
+  font-weight: 600;
+}
+
+.probability-bar {
+  position: relative;
+  height: 0.6rem;
+  border-radius: 999px;
+  background: rgba(30, 64, 175, 0.7);
+  overflow: hidden;
+}
+
+.probability-bar-fill {
+  position: absolute;
+  inset: 0;
+  transform-origin: left;
+  background: linear-gradient(90deg, #22c55e, #eab308, #ef4444);
+}
+
+.hint-text {
+  font-size: 0.8rem;
+  color: #9ca3af;
+}
+
+.empty-state {
+  margin-top: 0.4rem;
+}
