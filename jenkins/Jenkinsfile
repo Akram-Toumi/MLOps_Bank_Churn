@@ -7,7 +7,7 @@ pipeline {
     // Variables d'environnement
     environment {
         PROJECT_DIR = "${WORKSPACE}"
-        PYTHON_ENV = "python.exe"  // Utiliser Python système
+        PYTHON_ENV = "c:/Users/Tech House/AppData/Local/Programs/Python/Python312/python.exe"
         DRIFT_THRESHOLD = "0.1"
     }
     
@@ -27,15 +27,21 @@ pipeline {
                 
                 script {
                     try {
-                        // Installer evidently
+                        // Créer un environnement virtuel
                         bat """
-                            pip install evidently pandas numpy
+                            "${PYTHON_ENV}" -m venv venv
+                        """
+
+                        // Installer les dépendances dans le venv
+                        bat """
+                            venv\\Scripts\\python.exe -m pip install --upgrade pip
+                            venv\\Scripts\\pip.exe install evidently pandas numpy
                         """
                         echo '✅ Dépendances installées'
                         
                         // Générer les données de production
                         bat """
-                            ${PYTHON_ENV} scripts/generate_prod_data.py
+                            venv\\Scripts\\python.exe scripts/generate_prod_data.py
                         """
                         echo '✅ Données de production générées'
                     } catch (Exception e) {
@@ -57,7 +63,7 @@ pipeline {
                     try {
                         // Exécuter le script de monitoring
                         bat """
-                            ${PYTHON_ENV} monitoring/run_monitoring.py
+                            venv\\Scripts\\python.exe monitoring/run_monitoring.py
                         """
                         echo '✅ Monitoring terminé avec succès'
                     } catch (Exception e) {
