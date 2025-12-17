@@ -7,7 +7,7 @@ pipeline {
     // Variables d'environnement
     environment {
         PROJECT_DIR = "${WORKSPACE}"
-        PYTHON_ENV = "${PROJECT_DIR}/.venv/Scripts/python.exe"
+        PYTHON_ENV = "python.exe"  // Utiliser Python système
         DRIFT_THRESHOLD = "0.1"
     }
     
@@ -18,6 +18,34 @@ pipeline {
     }
     
     stages {
+        // ====================================================================
+        // STAGE 0: SETUP - Installation et préparation
+        // ====================================================================
+        stage('Setup Environment') {
+            steps {
+                echo '🔧 Installation des dépendances...'
+                
+                script {
+                    try {
+                        // Installer evidently
+                        bat """
+                            pip install evidently pandas numpy
+                        """
+                        echo '✅ Dépendances installées'
+                        
+                        // Générer les données de production
+                        bat """
+                            ${PYTHON_ENV} scripts/generate_prod_data.py
+                        """
+                        echo '✅ Données de production générées'
+                    } catch (Exception e) {
+                        echo "⚠️  Erreur setup: ${e.message}"
+                        currentBuild.result = 'UNSTABLE'
+                    }
+                }
+            }
+        }
+        
         // ====================================================================
         // STAGE 1: MONITORING - Exécution du script de monitoring
         // ====================================================================
