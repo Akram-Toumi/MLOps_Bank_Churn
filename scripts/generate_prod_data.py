@@ -61,6 +61,8 @@ if churn_col in df_prod.columns:
 
 # Sauvegarde
 print(f"\n💾 Sauvegarde...")
+import os
+os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
 df_prod.to_csv(OUTPUT_FILE, index=False)
 print(f"✅ Fichier sauvegardé: {OUTPUT_FILE}")
 print(f"   Taille: {len(df_prod):,} lignes × {len(df_prod.columns)} colonnes")
