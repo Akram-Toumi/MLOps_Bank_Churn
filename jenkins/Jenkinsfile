@@ -1,252 +1,107 @@
-// Jenkinsfile pour le pipeline MLOps
-// Pipeline CI/CD avec monitoring, data drift detection et DVC versioning
-
+// Jenkinsfile pour le pipeline MLOps - Version simplifiée et fonctionnelle
 pipeline {
     agent any
     
-    // Variables d'environnement
     environment {
-        PROJECT_DIR = "${WORKSPACE}"
-        PYTHON_ENV = "c:/Users/Tech House/AppData/Local/Programs/Python/Python312/python.exe"
-        DRIFT_THRESHOLD = "0.1"
-        PYTHONUTF8 = "1" // Force UTF-8 encoding for Python
-    }
-    
-    // Déclenchement automatique
-    triggers {
-        // Exécution quotidienne à 2h du matin
-        cron('0 2 * * *')
+        PYTHON_PATH = "C:/Users/Tech House/AppData/Local/Programs/Python/Python312/python.exe"
+        PYTHONUTF8 = "1"
+        DATA_SOURCE = "C:/Users/Tech House/Desktop/3eme/mlops/mlops/MLOps_Bank_Churn/data/churn.csv"
     }
     
     stages {
-        // ====================================================================
-        // STAGE 0: SETUP - Installation et préparation
-        // ====================================================================
-        stage('Setup Environment') {
+        stage('Setup') {
             steps {
-                echo '🔧 Installation des dépendances...'
-                
                 script {
-                    try {
-                        // Nettoyer l'ancien venv pour garantir une install propre
-                        bat """
-                            if exist venv rmdir /s /q venv
-                        """
-
-                        // Créer un environnement virtuel
-                        bat """
-                            echo "Création du venv..."
-                            "${PYTHON_ENV}" -m venv venv
-                        """
-
-                        // Workaround: Copier les données depuis le dossier local car non présentes dans Git
-                        // Jenkins ne trouve pas les fichiers ignorés par .gitignore
-                        bat """
-                            if not exist data mkdir data
-                            copy "C:\\Users\\Tech House\\Desktop\\3eme\\mlops\\mlops\\MLOps_Bank_Churn\\data\\churn.csv" "data\\churn.csv"
-                        """
-
-                        // Installer les dépendances avec vérification explicite
-                        bat """
-                            echo "=== INSTALLATION DES DEPENDANCES ==="
-                            venv\\Scripts\\python.exe -m pip install --upgrade pip setuptools wheel
-                            venv\\Scripts\\python.exe -m pip install --no-cache-dir evidently pandas numpy
-                            echo ""
-                            echo "=== VERIFICATION INSTALLATION ==="
-                            venv\\Scripts\\python.exe -m pip show evidently
-                            echo ""
-                            echo "=== TEST IMPORT EVIDENTLY ==="
-                            venv\\Scripts\\python.exe -c "import evidently; print(f'✅ Evidently {evidently.__version__} installé'); from evidently.report import Report; print('✅ Report importé')"
-                        """
-                        echo '✅ Dépendances vérifiées'
-
-                        // Générer les données de production
-                        bat """
-                            venv\\Scripts\\python.exe scripts/generate_prod_data.py
-                        """
-                        echo '✅ Données de production générées'
-                    } catch (Exception e) {
-                        echo "⚠️  Erreur setup: ${e.message}"
-                        currentBuild.result = 'UNSTABLE'
-                    }
+                    bat """
+                        @echo off
+                        echo ========================================
+                        echo SETUP ENVIRONMENT
+                        echo ========================================
+                        
+                        REM Nettoyer ancien venv
+                        if exist venv rmdir /s /q venv
+                        
+                        REM Créer nouveau venv
+                        "${PYTHON_PATH}" -m venv venv
+                        
+                        REM Copier données
+                        if not exist data mkdir data
+                        copy "${DATA_SOURCE}" "data\\churn.csv" /Y
+                        
+                        REM Installer dépendances
+                        venv\\Scripts\\python.exe -m pip install --quiet --upgrade pip
+                        venv\\Scripts\\python.exe -m pip install --quiet --no-cache-dir evidently==0.4.33 pandas==2.0.3 numpy==1.24.3
+                        
+                        REM Vérifier installation
+                        venv\\Scripts\\python.exe -c "import evidently; from evidently.report import Report; print('✓ Evidently OK')" || exit /b 1
+                        
+                        echo ✓ Setup terminé
+                    """
                 }
             }
         }
         
-        // ====================================================================
-        // STAGE 1: MONITORING - Exécution du script de monitoring
-        // ====================================================================
-        stage('Data Drift Monitoring') {
+        stage('Generate Production Data') {
             steps {
-                echo '🔍 Exécution du monitoring Evidently...'
-                
                 script {
-                    try {
-                        // Exécuter le script de monitoring
-                        bat """
-                            venv\\Scripts\\python.exe monitoring/run_monitoring.py
-                        """
-                        echo '✅ Monitoring terminé avec succès'
-                    } catch (Exception e) {
-                        echo "⚠️  Erreur lors du monitoring: ${e.message}"
-                        currentBuild.result = 'UNSTABLE'
-                    }
+                    bat """
+                        @echo off
+                        echo ========================================
+                        echo GENERATION DONNEES PRODUCTION
+                        echo ========================================
+                        venv\\Scripts\\python.exe scripts/generate_prod_data.py
+                    """
                 }
             }
-            
+        }
+        
+        stage('Run Monitoring') {
+            steps {
+                script {
+                    bat """
+                        @echo off
+                        echo ========================================
+                        echo MONITORING DATA DRIFT
+                        echo ========================================
+                        venv\\Scripts\\python.exe monitoring/run_monitoring.py
+                    """
+                }
+            }
             post {
                 always {
-                    // Archiver les rapports générés
-                    archiveArtifacts artifacts: 'monitoring/*.html, monitoring/*.json', 
-                                   allowEmptyArchive: true
-                    
-                    // Publier le rapport HTML
+                    archiveArtifacts artifacts: 'monitoring/*.html, monitoring/*.json', allowEmptyArchive: true
                     publishHTML([
-                        allowMissing: false,
+                        allowMissing: true,
                         alwaysLinkToLastBuild: true,
                         keepAll: true,
                         reportDir: 'monitoring',
                         reportFiles: 'monitoring_report.html',
-                        reportName: 'Evidently Data Drift Report'
+                        reportName: 'Evidently Report'
                     ])
                 }
             }
         }
         
-        // ====================================================================
-        // STAGE 2: CHECK DRIFT - Vérifier si un drift a été détecté
-        // ====================================================================
-        stage('Check Data Drift') {
+        stage('Check Drift') {
             steps {
-                echo '📊 Vérification du data drift...'
-                
                 script {
-                    // Vérifier l'existence du fichier trigger
-                    def triggerExists = fileExists('trigger.txt')
-                    
-                    if (triggerExists) {
-                        echo '🚨 DATA DRIFT DETECTED!'
-                        
-                        // Lire le contenu du trigger
-                        def triggerContent = readFile('trigger.txt')
-                        echo "Détails du drift:\n${triggerContent}"
-                        
-                        // Marquer le build comme instable
+                    def driftDetected = fileExists('trigger.txt')
+                    if (driftDetected) {
+                        echo '🚨 DATA DRIFT DETECTED'
                         currentBuild.result = 'UNSTABLE'
-                        
-                        // Définir une variable pour les stages suivants
-                        env.DRIFT_DETECTED = 'true'
                     } else {
-                        echo '✅ Aucun drift détecté - Modèle stable'
-                        env.DRIFT_DETECTED = 'false'
-                    }
-                }
-            }
-        }
-        
-        // ====================================================================
-        // STAGE 3: DVC VERSIONING - Versionner si drift détecté
-        // ====================================================================
-        stage('DVC Versioning') {
-            when {
-                expression { env.DRIFT_DETECTED == 'true' }
-            }
-            
-            steps {
-                echo '📦 Versioning avec DVC...'
-                
-                script {
-                    try {
-                        // Initialiser DVC si nécessaire
-                        bat """
-                            dvc init --force || echo "DVC déjà initialisé"
-                        """
-                        
-                        // Ajouter les données de production
-                        bat """
-                            dvc add data/production/bank_churn_prod.csv
-                        """
-                        
-                        // Commit DVC
-                        bat """
-                            git add data/production/bank_churn_prod.csv.dvc .dvc/config
-                            git commit -m "DVC: Version production data after drift detection" || echo "Rien à commiter"
-                        """
-                        
-                        // Push DVC (vers remote local)
-                        bat """
-                            dvc push || echo "DVC push échoué - vérifier la configuration du remote"
-                        """
-                        
-                        echo '✅ Versioning DVC terminé'
-                    } catch (Exception e) {
-                        echo "⚠️  Erreur DVC: ${e.message}"
-                        echo "Note: DVC nécessite une configuration préalable"
-                    }
-                }
-            }
-        }
-        
-        // ====================================================================
-        // STAGE 4: NOTIFICATION - Envoyer des alertes
-        // ====================================================================
-        stage('Notification') {
-            steps {
-                echo '📧 Envoi des notifications...'
-                
-                script {
-                    if (env.DRIFT_DETECTED == 'true') {
-                        // Notification de drift détecté
-                        echo """
-                        ╔════════════════════════════════════════╗
-                        ║   🚨 DATA DRIFT ALERT 🚨              ║
-                        ╠════════════════════════════════════════╣
-                        ║ Un drift significatif a été détecté   ║
-                        ║ dans les données de production.       ║
-                        ║                                        ║
-                        ║ Actions recommandées:                  ║
-                        ║ 1. Consulter le rapport Evidently     ║
-                        ║ 2. Analyser les colonnes avec drift   ║
-                        ║ 3. Considérer le réentraînement       ║
-                        ║ 4. Vérifier le versioning DVC         ║
-                        ╚════════════════════════════════════════╝
-                        """
-                        
-                        // Dans un environnement réel, envoyer un email/Slack
-                        // emailext subject: "Data Drift Detected",
-                        //          body: readFile('trigger.txt'),
-                        //          to: "data-team@company.com"
-                    } else {
-                        echo '✅ Système stable - Aucune action requise'
+                        echo '✓ No drift detected'
                     }
                 }
             }
         }
     }
     
-    // ====================================================================
-    // POST-BUILD ACTIONS
-    // ====================================================================
     post {
-        success {
-            echo '✅ Pipeline terminé avec succès'
-        }
-        
-        unstable {
-            echo '⚠️  Pipeline terminé avec warnings (drift détecté)'
-        }
-        
-        failure {
-            echo '❌ Pipeline échoué'
-        }
-        
         always {
-            // Nettoyer les fichiers temporaires
-            echo '🧹 Nettoyage...'
-            
-            // Archiver les logs
-            archiveArtifacts artifacts: 'trigger.txt', 
-                           allowEmptyArchive: true
+            echo '=========================================='
+            echo "Build: ${currentBuild.result ?: 'SUCCESS'}"
+            echo '=========================================='
         }
     }
 }
