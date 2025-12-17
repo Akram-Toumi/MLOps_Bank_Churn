@@ -1,8 +1,9 @@
-// Jenkinsfile MLOps - Version ultra-simplifiée
+// Jenkinsfile MLOps - Version finale fonctionnelle
 pipeline {
     agent any
     
     environment {
+        PYTHON = "C:\\Users\\Tech House\\AppData\\Local\\Programs\\Python\\Python312\\python.exe"
         PYTHONUTF8 = "1"
     }
     
@@ -13,38 +14,21 @@ pipeline {
                     echo ========================================
                     echo SETUP
                     echo ========================================
-                    
-                    REM Créer dossier data si nécessaire
                     if not exist data mkdir data
                     if not exist data\\production mkdir data\\production
-                    
-                    REM Copier churn.csv depuis le workspace local (pas depuis Desktop)
-                    REM Le fichier devrait être dans le repo Git
-                    if exist ..\\..\\..\\..\\data\\churn.csv (
-                        copy ..\\..\\..\\..\\data\\churn.csv data\\churn.csv /Y
-                    ) else (
-                        echo WARNING: churn.csv not found, using existing if available
-                    )
-                    
                     echo Setup OK
                 """
             }
         }
         
-        stage('Install Dependencies') {
+        stage('Install') {
             steps {
                 bat """
                     echo ========================================
                     echo INSTALLATION
                     echo ========================================
-                    
-                    REM Utiliser Python système
-                    python -m pip install --quiet evidently==0.4.33 pandas numpy
-                    
-                    REM Vérifier
-                    python -c "from evidently.report import Report; print('OK')"
-                    
-                    echo Installation OK
+                    "${PYTHON}" -m pip install --quiet evidently==0.4.33 pandas numpy
+                    "${PYTHON}" -c "from evidently.report import Report; print('✓ Evidently OK')"
                 """
             }
         }
@@ -55,7 +39,7 @@ pipeline {
                     echo ========================================
                     echo GENERATION DONNEES
                     echo ========================================
-                    python scripts/generate_prod_data.py
+                    "${PYTHON}" scripts/generate_prod_data.py
                 """
             }
         }
@@ -66,7 +50,7 @@ pipeline {
                     echo ========================================
                     echo MONITORING
                     echo ========================================
-                    python monitoring/run_monitoring.py
+                    "${PYTHON}" monitoring/run_monitoring.py
                 """
             }
             post {
@@ -92,7 +76,9 @@ pipeline {
     
     post {
         always {
+            echo "=========================================="
             echo "Build: ${currentBuild.result ?: 'SUCCESS'}"
+            echo "=========================================="
         }
     }
 }
