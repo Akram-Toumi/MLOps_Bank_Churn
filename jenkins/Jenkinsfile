@@ -1,83 +1,77 @@
-// Jenkinsfile pour le pipeline MLOps - Version simplifiée et fonctionnelle
+// Jenkinsfile MLOps - Version ultra-simplifiée
 pipeline {
     agent any
     
     environment {
-        PYTHON_PATH = "C:/Users/Tech House/AppData/Local/Programs/Python/Python312/python.exe"
         PYTHONUTF8 = "1"
-        DATA_SOURCE = "C:/Users/Tech House/Desktop/3eme/mlops/mlops/MLOps_Bank_Churn/data/churn.csv"
     }
     
     stages {
         stage('Setup') {
             steps {
-                script {
-                    bat """
-                        @echo off
-                        echo ========================================
-                        echo SETUP ENVIRONMENT
-                        echo ========================================
-                        
-                        REM Nettoyer ancien venv
-                        if exist venv rmdir /s /q venv
-                        
-                        REM Créer nouveau venv
-                        "${PYTHON_PATH}" -m venv venv
-                        
-                        REM Copier données
-                        if not exist data mkdir data
-                        copy "${DATA_SOURCE}" "data\\churn.csv" /Y
-                        
-                        REM Installer dépendances
-                        venv\\Scripts\\python.exe -m pip install --quiet --upgrade pip
-                        venv\\Scripts\\python.exe -m pip install --quiet --no-cache-dir evidently==0.4.33 pandas==2.0.3 numpy==1.24.3
-                        
-                        REM Vérifier installation
-                        venv\\Scripts\\python.exe -c "import evidently; from evidently.report import Report; print('✓ Evidently OK')" || exit /b 1
-                        
-                        echo ✓ Setup terminé
-                    """
-                }
+                bat """
+                    echo ========================================
+                    echo SETUP
+                    echo ========================================
+                    
+                    REM Créer dossier data si nécessaire
+                    if not exist data mkdir data
+                    if not exist data\\production mkdir data\\production
+                    
+                    REM Copier churn.csv depuis le workspace local (pas depuis Desktop)
+                    REM Le fichier devrait être dans le repo Git
+                    if exist ..\\..\\..\\..\\data\\churn.csv (
+                        copy ..\\..\\..\\..\\data\\churn.csv data\\churn.csv /Y
+                    ) else (
+                        echo WARNING: churn.csv not found, using existing if available
+                    )
+                    
+                    echo Setup OK
+                """
             }
         }
         
-        stage('Generate Production Data') {
+        stage('Install Dependencies') {
             steps {
-                script {
-                    bat """
-                        @echo off
-                        echo ========================================
-                        echo GENERATION DONNEES PRODUCTION
-                        echo ========================================
-                        venv\\Scripts\\python.exe scripts/generate_prod_data.py
-                    """
-                }
+                bat """
+                    echo ========================================
+                    echo INSTALLATION
+                    echo ========================================
+                    
+                    REM Utiliser Python système
+                    python -m pip install --quiet evidently==0.4.33 pandas numpy
+                    
+                    REM Vérifier
+                    python -c "from evidently.report import Report; print('OK')"
+                    
+                    echo Installation OK
+                """
             }
         }
         
-        stage('Run Monitoring') {
+        stage('Generate Data') {
             steps {
-                script {
-                    bat """
-                        @echo off
-                        echo ========================================
-                        echo MONITORING DATA DRIFT
-                        echo ========================================
-                        venv\\Scripts\\python.exe monitoring/run_monitoring.py
-                    """
-                }
+                bat """
+                    echo ========================================
+                    echo GENERATION DONNEES
+                    echo ========================================
+                    python scripts/generate_prod_data.py
+                """
+            }
+        }
+        
+        stage('Monitor') {
+            steps {
+                bat """
+                    echo ========================================
+                    echo MONITORING
+                    echo ========================================
+                    python monitoring/run_monitoring.py
+                """
             }
             post {
                 always {
                     archiveArtifacts artifacts: 'monitoring/*.html, monitoring/*.json', allowEmptyArchive: true
-                    publishHTML([
-                        allowMissing: true,
-                        alwaysLinkToLastBuild: true,
-                        keepAll: true,
-                        reportDir: 'monitoring',
-                        reportFiles: 'monitoring_report.html',
-                        reportName: 'Evidently Report'
-                    ])
                 }
             }
         }
@@ -85,12 +79,11 @@ pipeline {
         stage('Check Drift') {
             steps {
                 script {
-                    def driftDetected = fileExists('trigger.txt')
-                    if (driftDetected) {
-                        echo '🚨 DATA DRIFT DETECTED'
+                    if (fileExists('trigger.txt')) {
+                        echo '🚨 DRIFT DETECTED'
                         currentBuild.result = 'UNSTABLE'
                     } else {
-                        echo '✓ No drift detected'
+                        echo '✓ No drift'
                     }
                 }
             }
@@ -99,9 +92,7 @@ pipeline {
     
     post {
         always {
-            echo '=========================================='
             echo "Build: ${currentBuild.result ?: 'SUCCESS'}"
-            echo '=========================================='
         }
     }
 }
