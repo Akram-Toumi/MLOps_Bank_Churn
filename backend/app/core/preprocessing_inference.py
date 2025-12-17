@@ -126,11 +126,15 @@ class InferencePreprocessor:
             df_clean['Age'] = (reference_date - df_clean['Date of Birth']).dt.days / 365.25
             df_clean['Age'] = df_clean['Age'].round(0).astype(int)
             
+            # Ensure Age has no NaN values before binning
+            if df_clean['Age'].isnull().any():
+                df_clean['Age'] = df_clean['Age'].fillna(df_clean['Age'].median())
             # Create age groups
             df_clean['Age_Group'] = pd.cut(
                 df_clean['Age'],
-                bins=[0, 25, 35, 45, 55, 65, 100],
-                labels=['18-25', '26-35', '36-45', '46-55', '56-65', '65+']
+                bins=[0, 25, 35, 45, 55, 65, float('inf')],  # Use inf to catch all ages >= 65
+                labels=['18-25', '26-35', '36-45', '46-55', '56-65', '65+'],
+                include_lowest=True
             )
             df_clean = df_clean.drop(columns=['Date of Birth'])
         
@@ -156,17 +160,26 @@ class InferencePreprocessor:
             )
         
         if 'Customer Tenure' in df_clean.columns:
+            # Ensure Customer Tenure has no NaN values before binning
+            if df_clean['Customer Tenure'].isnull().any():
+                df_clean['Customer Tenure'] = df_clean['Customer Tenure'].fillna(df_clean['Customer Tenure'].median())
+            # Use include_lowest=True and handle out-of-range values
+            # Bins: [0, 6, 12, 24, inf] means: 0-6m, 6-12m, 12-24m, 24m+
             df_clean['Tenure_Group'] = pd.cut(
                 df_clean['Customer Tenure'],
-                bins=[0, 6, 12, 24, 30],
-                labels=['0-6m', '6-12m', '1-2y', '2y+']
+                bins=[0, 6, 12, 24, float('inf')],  # Use inf to catch all values >= 24
+                labels=['0-6m', '6-12m', '1-2y', '2y+'],
+                include_lowest=True
             )
         
         if 'Credit Score' in df_clean.columns:
+            # Clip credit score to valid range before binning
+            df_clean['Credit Score'] = df_clean['Credit Score'].clip(lower=300, upper=850)
             df_clean['Credit_Category'] = pd.cut(
                 df_clean['Credit Score'],
                 bins=[0, 579, 669, 739, 799, 850],
-                labels=['Poor', 'Fair', 'Good', 'Very Good', 'Excellent']
+                labels=['Poor', 'Fair', 'Good', 'Very Good', 'Excellent'],
+                include_lowest=True
             )
         
         if 'NumOfProducts' in df_clean.columns and 'Customer Tenure' in df_clean.columns:
@@ -207,7 +220,19 @@ class InferencePreprocessor:
         categorical_cols = df_clean.select_dtypes(include=['object', 'category']).columns
         for col in categorical_cols:
             if df_clean[col].isnull().sum() > 0:
-                df_clean[col].fillna(df_clean[col].mode()[0] if len(df_clean[col].mode()) > 0 else 'Unknown', inplace=True)
+                # Handle categorical columns properly
+                if pd.api.types.is_categorical_dtype(df_clean[col]):
+                    # For categorical columns, use the first available category or add 'Unknown' if needed
+                    mode_value = df_clean[col].mode()[0] if len(df_clean[col].mode()) > 0 else df_clean[col].cat.categories[0] if len(df_clean[col].cat.categories) > 0 else None
+                    if mode_value is None:
+                        # Add 'Unknown' category if it doesn't exist
+                        if 'Unknown' not in df_clean[col].cat.categories:
+                            df_clean[col] = df_clean[col].cat.add_categories(['Unknown'])
+                        mode_value = 'Unknown'
+                    df_clean[col] = df_clean[col].fillna(mode_value)
+                else:
+                    # For regular object columns
+                    df_clean[col].fillna(df_clean[col].mode()[0] if len(df_clean[col].mode()) > 0 else 'Unknown', inplace=True)
         
         # 5. Encode categorical variables
         if 'Gender' in df_clean.columns:
