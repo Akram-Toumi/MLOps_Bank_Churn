@@ -39,6 +39,13 @@ pipeline {
                             )
                         """
 
+                        // Workaround: Copier les données depuis le dossier local car non présentes dans Git
+                        // Jenkins ne trouve pas les fichiers ignorés par .gitignore
+                        bat """
+                            if not exist data mkdir data
+                            copy "C:\\Users\\Tech House\\Desktop\\3eme\\mlops\\mlops\\MLOps_Bank_Churn\\data\\churn.csv" "data\\churn.csv"
+                        """
+
                         // Installer les dépendances
                         bat """
                             venv\\Scripts\\python.exe -m pip install --upgrade pip
