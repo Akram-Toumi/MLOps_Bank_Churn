@@ -1,111 +1,58 @@
-# ----------------------------------------
-# PYTHON
-# ----------------------------------------
+# Python
 __pycache__/
 *.py[cod]
-*.pyo
-*.pyd
+*$py.class
 *.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
 *.egg-info/
+.installed.cfg
 *.egg
 
-# Virtual environments
-venv/
-.env/
+# Environment
+.env
 .env.local
-.venv/
-*.env
-# Jupyter
-.ipynb_checkpoints/
-# Cache
-.cache/
-.mypy_cache/
-pytest_cache/
-pip-wheel-metadata/
-.pytype/
-.dmypy.json
-# ----------------------------------------
-# DATA & MODELS (DVC MANAGED)
-# ----------------------------------------
-data/
-data/*
-!data/.gitkeep
-model/
-model/*
-!model/.gitkeep
-monitoring/data/
-notebooks/data/
-notebooks/processors/
-notebooks/*.pkl
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Logs
+*.log
+logs/
+
+# MLflow
+mlruns/
 *.pkl
 
-
-# DVC
-*.dvc
-.dvc/
-.dvcignore
-.cache/
-# Prevent large dataset download files
-*.zip
-*.tar
-*.tar.gz
-*.h5
-*.csv
-*.tsv
-*.jsonl
-*.parquet
-# ----------------------------------------
-# FASTAPI / STREAMLIT
-# ----------------------------------------
-backend/__pycache__/
-frontend/__pycache__/
-# uvicorn logs
-*.log
-# Streamlit
-.streamlit/secrets.toml
-.streamlit/*.json
-
-# ----------------------------------------
-# MLflow
-# ----------------------------------------
-mlflow/mlruns/
-mlruns/
-**/mlruns/
-mlflow.db
-
-
-# ----------------------------------------
-# DOCKER
-# ----------------------------------------
-# docker build files
-*.pid
-*.seed
-*.bak
-docker-compose.override.yml
-# Docker cache
-**/.dockerignore
-
-# ----------------------------------------
-# SYSTEM / EDITOR FILES
-# ----------------------------------------
-# VSCode
-.vscode/
-*.code-workspace
-
-# ----------------------------------------
-# GITHUB ACTIONS
-# ----------------------------------------
-.github/workflows/*.tmp
-.github/workflows/*.backup
-
-
-# ----------------------------------------
-# DIST / BUILD
-# ----------------------------------------
-build/
-dist/
-*.spec
-*.manifest
-
-mlartifacts/
-mlruns/
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/

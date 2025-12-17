@@ -1,0 +1,29 @@
+================================================================================
+RAPPORT DE SYNTHÈSE - MODÈLE CHAMPION
+================================================================================
+
+Date de génération: 2025-12-17 20:01:59
+
+Modèle Champion: Logistic Regression (ElasticNet) [Optimisé]
+Catégorie: Optimisé
+
+PERFORMANCES:
+  • ROC-AUC:   0.9999
+  • F1-Score:  0.9549
+  • Recall:    1.0000
+  • Precision: 0.9137
+  • Accuracy:  0.9883
+
+MATRICE DE CONFUSION:
+  • Vrais Négatifs:  5,189
+  • Faux Positifs:   70
+  • Faux Négatifs:   0
+  • Vrais Positifs:  741
+
+HYPERPARAMÈTRES OPTIMAUX:
+  • C: 9.219742350231167
+  • l1_ratio: 0.0884925020519195
+  • max_iter: 1775
+  • tol: 5.522728891053806e-05
+
+================================================================================

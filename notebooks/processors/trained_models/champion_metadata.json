@@ -1,0 +1,32 @@
+{
+    "model_identifier": "Logistic Regression (ElasticNet) [Optimis\u00e9]",
+    "model_category": "Optimis\u00e9",
+    "base_model_type": "Logistic Regression (ElasticNet)",
+    "performance_metrics": {
+        "roc_auc_score": 0.9998999209375407,
+        "f1_score": 0.9548969072164949,
+        "recall_score": 1.0,
+        "precision_score": 0.9136868064118372,
+        "accuracy_score": 0.9883333333333333
+    },
+    "confusion_matrix": {
+        "true_negatives": 5189,
+        "false_positives": 70,
+        "false_negatives": 0,
+        "true_positives": 741
+    },
+    "optimal_hyperparameters": {
+        "C": 9.219742350231167,
+        "l1_ratio": 0.0884925020519195,
+        "max_iter": 1775,
+        "tol": 5.522728891053806e-05
+    },
+    "training_duration_seconds": 0,
+    "evaluation_timestamp": "2025-12-17 20:01:58",
+    "training_samples": 42070,
+    "test_samples": 6000,
+    "class_distribution": {
+        "train_fraud_rate": 0.5,
+        "test_fraud_rate": 0.1235
+    }
+}

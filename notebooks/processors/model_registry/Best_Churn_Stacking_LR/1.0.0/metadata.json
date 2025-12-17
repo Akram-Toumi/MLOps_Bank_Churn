@@ -1,0 +1,14 @@
+{
+  "model_name": "Best_Churn_Stacking_LR",
+  "version": "1.0.0",
+  "stage": "production",
+  "registered_at": "2025-12-17T20:40:54.600560",
+  "metrics": {
+    "accuracy": 0.9965,
+    "precision": 0.9774535809018567,
+    "recall": 0.9946018893387314,
+    "f1_score": 0.9859531772575251,
+    "roc_auc": 0.9999045399711926
+  },
+  "run_id": "b72341500b49443c96727e61083a457d"
+}
