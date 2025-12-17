@@ -28,15 +28,15 @@ pipeline {
                 
                 script {
                     try {
-                        // Optimisation: Créer venv seulement s'il n'existe pas
-                        // Note: sur Windows, la vérification de dossier en batch est spécifique
+                        // Nettoyer l'ancien venv pour garantir une install propre
                         bat """
-                            if not exist venv (
-                                echo "Création du venv..."
-                                "${PYTHON_ENV}" -m venv venv
-                            ) else (
-                                echo "Le venv existe déjà."
-                            )
+                            if exist venv rmdir /s /q venv
+                        """
+
+                        // Créer un environnement virtuel
+                        bat """
+                            echo "Création du venv..."
+                            "${PYTHON_ENV}" -m venv venv
                         """
 
                         // Workaround: Copier les données depuis le dossier local car non présentes dans Git

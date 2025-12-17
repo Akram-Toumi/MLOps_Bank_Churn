@@ -13,7 +13,10 @@ try:
     from evidently.report import Report
     from evidently.metric_preset import DataDriftPreset, DataQualityPreset
     from evidently.metrics import *
-except ImportError:
+except ImportError as e:
+    import traceback
+    traceback.print_exc()
+    print(f"⚠️  Erreur ImportEvidently: {e}")
     print("⚠️  Evidently n'est pas installé. Installez-le avec: pip install evidently")
     exit(1)
 
