@@ -87,6 +87,31 @@ pipeline {
                 """
             }
         }
+        
+        stage('Run Tests') {
+            steps {
+                bat """
+                    echo ========================================
+                    echo RUNNING TESTS
+                    echo ========================================
+                    "${PYTHON}" -m pip install --quiet -r testing/requirements.txt
+                    "${PYTHON}" -m pytest testing/ -v --html=reports/test_report.html --self-contained-html
+                """
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'reports/*.html', allowEmptyArchive: true
+                    publishHTML([
+                        allowMissing: true,
+                        alwaysLinkToLastBuild: true,
+                        keepAll: true,
+                        reportDir: 'reports',
+                        reportFiles: 'test_report.html',
+                        reportName: 'Test Report'
+                    ])
+                }
+            }
+        }
     }
     
     post {
