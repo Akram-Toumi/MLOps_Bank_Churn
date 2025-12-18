@@ -14,8 +14,18 @@ pipeline {
                     echo ========================================
                     echo SETUP
                     echo ========================================
+                    
+                    REM Créer les dossiers nécessaires
                     if not exist data mkdir data
                     if not exist data\\production mkdir data\\production
+                    if not exist data\\batches mkdir data\\batches
+                    if not exist data\\train mkdir data\\train
+                    
+                    REM Copier les batches depuis le projet local
+                    copy "C:\\Users\\Tech House\\Desktop\\3eme\\mlops\\mlops\\MLOps_Bank_Churn\\data\\batches\\batch1.csv" "data\\batches\\batch1.csv" /Y
+                    copy "C:\\Users\\Tech House\\Desktop\\3eme\\mlops\\mlops\\MLOps_Bank_Churn\\data\\batches\\batch2.csv" "data\\batches\\batch2.csv" /Y
+                    copy "C:\\Users\\Tech House\\Desktop\\3eme\\mlops\\mlops\\MLOps_Bank_Churn\\data\\train\\part1.csv" "data\\train\\part1.csv" /Y
+                    
                     echo Setup OK
                 """
             }
