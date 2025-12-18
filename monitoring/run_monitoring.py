@@ -69,16 +69,23 @@ if len(df_production) > SAMPLE_SIZE:
     df_production = df_production.sample(n=SAMPLE_SIZE, random_state=42)
     print(f"⚡ Échantillon production: {len(df_production):,} lignes (pour performance)")
 
-# Sélectionner les colonnes communes (toutes, pas seulement numériques)
-common_cols = [col for col in df_reference.columns if col in df_production.columns]
+# Sélectionner UNIQUEMENT les colonnes numériques pertinentes
+# Exclure les IDs, noms, dates, et la target
+numeric_cols = df_reference.select_dtypes(include=['int64', 'float64', 'int32', 'float32']).columns.tolist()
 
-# Exclure les colonnes ID et target
-exclude_cols = ['id', 'ID', 'customer_id', 'Customer ID', 'Churn', 'Churn Flag']
-drift_cols = [col for col in common_cols if col not in exclude_cols]
+# Colonnes à exclure absolument
+exclude_cols = [
+    'RowNumber', 'CustomerId', 'id', 'ID', 
+    'Churn', 'Churn Flag',  # Target
+    'Number of Dependents',  # Souvent constant
+]
 
-print(f"📊 Colonnes analysées pour le drift: {len(drift_cols)}")
-print(f"   {drift_cols[:10]}")
-print(f"   Colonnes exclues: {[c for c in exclude_cols if c in common_cols]}")
+# Garder seulement les features numériques pertinentes
+drift_cols = [col for col in numeric_cols if col not in exclude_cols]
+
+print(f"📊 Colonnes numériques analysées pour le drift: {len(drift_cols)}")
+print(f"   {drift_cols}")
+print(f"   Colonnes exclues: {[c for c in exclude_cols if c in df_reference.columns]}")
 
 # ============================================================================
 # GÉNÉRATION DU RAPPORT EVIDENTLY
