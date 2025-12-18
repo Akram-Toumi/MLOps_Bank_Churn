@@ -85,7 +85,7 @@ for col in drift_cols:
         'ks_statistic': float(ks_stat),
         'p_value': float(ks_pvalue),
         'effect_size': float(effect_size),
-        'drift_detected': drift_detected,
+        'drift_detected': bool(drift_detected),  # Convert to Python bool
         'ref_mean': float(ref_mean),
         'prod_mean': float(prod_mean),
         'change_pct': float((prod_mean - ref_mean) / ref_mean * 100)
