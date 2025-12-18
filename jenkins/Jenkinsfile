@@ -90,8 +90,12 @@ pipeline {
             steps {
                 bat """
                     echo ========================================
-                    echo RETRAINING MODEL
+                    echo RETRAINING - FULL PIPELINE
                     echo ========================================
+                    echo Installing ML dependencies...
+                    "${PYTHON}" -m pip install --quiet xgboost lightgbm catboost scikit-learn
+                    
+                    echo Running complete retraining...
                     "${PYTHON}" scripts/retrain_model.py
                 """
             }

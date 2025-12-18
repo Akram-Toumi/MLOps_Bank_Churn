@@ -1,230 +1,307 @@
 """
-Script de réentraînement automatique
-Se déclenche quand un drift est détecté
-Charge le modèle de production, réentraîne sur données combinées, compare et promeut si meilleur
+Script de réentraînement complet
+Preprocess → Combine → Train all models → Compare → Promote
 """
 
 import pandas as pd
 import numpy as np
+import pickle
+import os
+import sys
 import mlflow
 import mlflow.sklearn
 from mlflow.tracking import MlflowClient
-import pickle
-import sys
-import os
-from pathlib import Path
-from sklearn.metrics import roc_auc_score, f1_score, precision_score, recall_score
+from datetime import datetime
+from sklearn.model_selection import train_test_split, RandomizedSearchCV
+from sklearn.metrics import roc_auc_score, f1_score, precision_score, recall_score, accuracy_score
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier, StackingClassifier, VotingClassifier
+from xgboost import XGBClassifier
+from lightgbm import LGBMClassifier
+from catboost import CatBoostClassifier
+from scipy.stats import randint, uniform
+
+# Import preprocessing
+sys.path.append('scripts')
+from preprocess_production import ProductionDataPreprocessor
 
 # Configuration
 MLFLOW_TRACKING_URI = "sqlite:///mlflow.db"
 EXPERIMENT_NAME = "Bank_Churn_Retraining"
-PREPROCESSOR_PATH = "notebooks/processors/preprocessor.pkl"
-INITIAL_TRAINING_DATA = "data/train/part1.csv"
-PRODUCTION_DATA = "data/production/bank_churn_prod.csv"
-
-# Seuil d'amélioration pour promotion (2% ROC-AUC)
-IMPROVEMENT_THRESHOLD = 0.02
+PRODUCTION_MODEL_NAME = "churn_prediction_Stacking_LR"
+INITIAL_TRAINING_DATA = "notebooks/processors/preprocessed_data.pkl"
+PRODUCTION_DATA_RAW = "data/production/bank_churn_prod.csv"
+PROCESSOR_DIR = "notebooks/processors"
+IMPROVEMENT_THRESHOLD = 0.02  # 2% ROC-AUC improvement required
+N_ITER = 5  # Reduced for faster retraining
+CV_FOLDS = 3
 
 print("=" * 80)
-print("RÉENTRAÎNEMENT AUTOMATIQUE DU MODÈLE")
+print("RÉENTRAÎNEMENT AUTOMATIQUE - PIPELINE COMPLET")
 print("=" * 80)
 
-# Configurer MLflow
+# ============================================================================
+# 1. PREPROCESSING DES NOUVELLES DONNÉES
+# ============================================================================
+print("\n📊 ÉTAPE 1: Preprocessing des données de production")
+print("=" * 80)
+
+preprocessor = ProductionDataPreprocessor()
+preprocessor.load_processors(PROCESSOR_DIR)
+df_prod_processed = preprocessor.preprocess(pd.read_csv(PRODUCTION_DATA_RAW))
+
+print(f"✅ Données preprocessées: {df_prod_processed.shape}")
+
+# ============================================================================
+# 2. CHARGEMENT ET COMBINAISON DES DONNÉES
+# ============================================================================
+print("\n📊 ÉTAPE 2: Combinaison avec données d'entraînement")
+print("=" * 80)
+
+with open(INITIAL_TRAINING_DATA, 'rb') as f:
+    initial_data = pickle.load(f)
+
+X_train_initial = initial_data['X_train']
+y_train_initial = initial_data['y_train']
+
+print(f"Données initiales: {X_train_initial.shape}")
+print(f"Nouvelles données: {df_prod_processed.shape}")
+
+# Séparer target des nouvelles données si présente
+if 'Churn Flag' in df_prod_processed.columns:
+    X_prod = df_prod_processed.drop('Churn Flag', axis=1)
+    y_prod = df_prod_processed['Churn Flag']
+else:
+    print("⚠️  Pas de target dans les données de production, skip")
+    X_prod = df_prod_processed
+    y_prod = None
+
+# Aligner les colonnes
+common_cols = list(set(X_train_initial.columns) & set(X_prod.columns))
+X_train_initial = X_train_initial[common_cols]
+X_prod = X_prod[common_cols]
+
+# Combiner
+if y_prod is not None:
+    X_combined = pd.concat([X_train_initial, X_prod], ignore_index=True)
+    y_combined = pd.concat([y_train_initial, y_prod], ignore_index=True)
+else:
+    X_combined = X_train_initial
+    y_combined = y_train_initial
+
+print(f"✅ Données combinées: {X_combined.shape}")
+print(f"   Churn rate: {y_combined.mean():.2%}")
+
+# Split train/test
+X_train, X_test, y_train, y_test = train_test_split(
+    X_combined, y_combined, test_size=0.2, random_state=42, stratify=y_combined
+)
+
+# ============================================================================
+# 3. CONFIGURATION MLflow
+# ============================================================================
+print("\n📊 ÉTAPE 3: Configuration MLflow")
+print("=" * 80)
+
 mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
 mlflow.set_experiment(EXPERIMENT_NAME)
 client = MlflowClient()
 
+print(f"✅ MLflow configuré")
+print(f"   Experiment: {EXPERIMENT_NAME}")
+
 # ============================================================================
-# 1. CHARGER LE MODÈLE DE PRODUCTION
+# 4. RÉCUPÉRATION DU MODÈLE DE PRODUCTION
 # ============================================================================
-print("\n📦 Chargement du modèle de production...")
+print("\n📊 ÉTAPE 4: Chargement modèle de production")
+print("=" * 80)
 
 try:
-    # Récupérer le modèle en production
-    prod_model_versions = client.get_latest_versions("BankChurnModel", stages=["Production"])
+    # Chercher le modèle par nom
+    registered_models = client.search_registered_models(f"name='{PRODUCTION_MODEL_NAME}'")
     
-    if not prod_model_versions:
-        print("⚠️  Aucun modèle en production trouvé")
-        print("   Utilisation du dernier modèle enregistré...")
-        # Fallback: prendre le dernier modèle
-        all_versions = client.search_model_versions("name='BankChurnModel'")
-        if not all_versions:
-            print("❌ ERREUR: Aucun modèle trouvé dans le registry")
-            sys.exit(1)
-        prod_model_version = all_versions[0]
+    if registered_models:
+        model_versions = client.search_model_versions(f"name='{PRODUCTION_MODEL_NAME}'")
+        if model_versions:
+            latest_version = max(model_versions, key=lambda x: int(x.version))
+            prod_run_id = latest_version.run_id
+            prod_model_uri = f"runs:/{prod_run_id}/model"
+            
+            # Charger le modèle
+            prod_model = mlflow.sklearn.load_model(prod_model_uri)
+            
+            # Récupérer les métriques
+            prod_run = client.get_run(prod_run_id)
+            prod_metrics = prod_run.data.metrics
+            prod_roc_auc = prod_metrics.get('roc_auc', prod_metrics.get('test_roc_auc', 0))
+            
+            print(f"✅ Modèle de production chargé")
+            print(f"   Nom: {PRODUCTION_MODEL_NAME}")
+            print(f"   Version: {latest_version.version}")
+            print(f"   ROC-AUC: {prod_roc_auc:.4f}")
+        else:
+            print("⚠️  Aucune version trouvée")
+            prod_roc_auc = 0
     else:
-        prod_model_version = prod_model_versions[0]
-    
-    prod_run_id = prod_model_version.run_id
-    prod_model_uri = f"runs:/{prod_run_id}/model"
-    prod_model = mlflow.sklearn.load_model(prod_model_uri)
-    
-    # Récupérer les métriques du modèle de production
-    prod_run = client.get_run(prod_run_id)
-    prod_metrics = prod_run.data.metrics
-    prod_roc_auc = prod_metrics.get('test_roc_auc', 0)
-    
-    print(f"✅ Modèle de production chargé")
-    print(f"   Run ID: {prod_run_id}")
-    print(f"   ROC-AUC: {prod_roc_auc:.4f}")
-    print(f"   Version: {prod_model_version.version}")
-    
+        print(f"⚠️  Modèle '{PRODUCTION_MODEL_NAME}' non trouvé")
+        prod_roc_auc = 0
 except Exception as e:
-    print(f"❌ ERREUR lors du chargement du modèle: {e}")
-    sys.exit(1)
+    print(f"⚠️  Erreur: {e}")
+    prod_roc_auc = 0
 
 # ============================================================================
-# 2. CHARGER ET COMBINER LES DONNÉES
+# 5. ENTRAÎNEMENT DES MODÈLES
 # ============================================================================
-print("\n📂 Chargement des données...")
+print("\n📊 ÉTAPE 5: Entraînement des modèles")
+print("=" * 80)
 
-# Charger les données d'entraînement initiales
-df_train = pd.read_csv(INITIAL_TRAINING_DATA)
-print(f"✅ Données initiales: {len(df_train):,} lignes")
+# Configurations baseline
+baseline_models = {
+    'XGBoost': XGBClassifier(n_estimators=150, max_depth=7, learning_rate=0.05, random_state=42, eval_metric='auc', use_label_encoder=False),
+    'LightGBM': LGBMClassifier(n_estimators=150, max_depth=8, learning_rate=0.05, random_state=42, verbose=-1),
+    'RandomForest': RandomForestClassifier(n_estimators=200, max_depth=25, random_state=42, n_jobs=-1),
+    'CatBoost': CatBoostClassifier(iterations=150, depth=7, learning_rate=0.05, random_state=42, verbose=False),
+    'LogisticRegression': LogisticRegression(penalty='elasticnet', solver='saga', l1_ratio=0.5, max_iter=1000, random_state=42, n_jobs=-1)
+}
 
-# Charger les nouvelles données de production
-df_prod = pd.read_csv(PRODUCTION_DATA)
-print(f"✅ Données production: {len(df_prod):,} lignes")
+# Search spaces pour tuning
+search_spaces = {
+    'XGBoost': {'n_estimators': randint(100, 300), 'max_depth': randint(3, 10), 'learning_rate': uniform(0.01, 0.19)},
+    'LightGBM': {'n_estimators': randint(100, 300), 'max_depth': randint(5, 12), 'learning_rate': uniform(0.01, 0.19)},
+    'RandomForest': {'n_estimators': randint(100, 300), 'max_depth': [15, 20, 25, 30], 'min_samples_split': randint(2, 15)},
+    'CatBoost': {'iterations': randint(100, 300), 'depth': randint(4, 10), 'learning_rate': uniform(0.01, 0.19)},
+    'LogisticRegression': {'C': uniform(0.01, 5), 'l1_ratio': uniform(0, 1)}
+}
 
-# Combiner
-df_combined = pd.concat([df_train, df_prod], ignore_index=True)
-print(f"✅ Données combinées: {len(df_combined):,} lignes")
+all_results = []
+trained_models = {}
 
-# ============================================================================
-# 3. PRÉPROCESSING
-# ============================================================================
-print("\n🔧 Préprocessing...")
-
-# Charger le preprocessor
-if os.path.exists(PREPROCESSOR_PATH):
-    with open(PREPROCESSOR_PATH, 'rb') as f:
-        preprocessor = pickle.load(f)
-    print(f"✅ Preprocessor chargé: {PREPROCESSOR_PATH}")
-else:
-    print(f"⚠️  Preprocessor non trouvé: {PREPROCESSOR_PATH}")
-    print("   Utilisation des données brutes...")
-    preprocessor = None
-
-# Séparer features et target
-target_col = 'Churn Flag' if 'Churn Flag' in df_combined.columns else 'Churn'
-X = df_combined.drop(columns=[target_col])
-y = df_combined[target_col]
-
-# Appliquer le preprocessing si disponible
-if preprocessor:
-    X_processed = preprocessor.transform(X)
-else:
-    # Preprocessing minimal
-    X_processed = X.select_dtypes(include=[np.number]).fillna(0)
-
-print(f"✅ Features: {X_processed.shape}")
-
-# Split train/test
-from sklearn.model_selection import train_test_split
-X_train, X_test, y_train, y_test = train_test_split(
-    X_processed, y, test_size=0.2, random_state=42, stratify=y
-)
-
-# ============================================================================
-# 4. RÉENTRAÎNEMENT
-# ============================================================================
-print("\n🔄 Réentraînement du modèle...")
-
-with mlflow.start_run(run_name="Retraining_After_Drift") as run:
-    # Récupérer les paramètres du modèle de production
-    prod_params = prod_run.data.params
-    
-    # Log des paramètres
-    mlflow.log_params({
-        "retraining": True,
-        "base_model_run_id": prod_run_id,
-        "training_rows": len(df_train),
-        "production_rows": len(df_prod),
-        "total_rows": len(df_combined)
-    })
-    
-    # Réentraîner avec les mêmes paramètres
-    from sklearn.ensemble import RandomForestClassifier
-    
-    # Utiliser les paramètres du modèle de production ou défauts
-    model = RandomForestClassifier(
-        n_estimators=int(prod_params.get('n_estimators', 100)),
-        max_depth=int(prod_params.get('max_depth', 10)) if prod_params.get('max_depth') != 'None' else None,
-        random_state=42,
-        n_jobs=-1
-    )
+# Train baseline
+print("\n🚀 Baseline models...")
+for name, model in baseline_models.items():
+    print(f"  {name}...", end=" ")
+    start = datetime.now()
     
     model.fit(X_train, y_train)
-    print("✅ Modèle réentraîné")
-    
-    # Prédictions
     y_pred = model.predict(X_test)
-    y_pred_proba = model.predict_proba(X_test)[:, 1]
+    y_proba = model.predict_proba(X_test)[:, 1]
     
-    # Métriques
-    roc_auc = roc_auc_score(y_test, y_pred_proba)
+    roc_auc = roc_auc_score(y_test, y_proba)
     f1 = f1_score(y_test, y_pred)
-    precision = precision_score(y_test, y_pred)
-    recall = recall_score(y_test, y_pred)
+    duration = (datetime.now() - start).total_seconds()
     
-    # Log des métriques
-    mlflow.log_metrics({
-        "test_roc_auc": roc_auc,
-        "test_f1": f1,
-        "test_precision": precision,
-        "test_recall": recall
-    })
+    with mlflow.start_run(run_name=f"{name}_baseline_retrain"):
+        mlflow.log_params({'model': name, 'stage': 'baseline', 'retrain': True})
+        mlflow.log_metrics({'roc_auc': roc_auc, 'f1_score': f1, 'duration': duration})
+        mlflow.sklearn.log_model(model, "model")
+        run_id = mlflow.active_run().info.run_id
     
-    # Log du modèle
-    mlflow.sklearn.log_model(model, "model")
+    trained_models[f"{name}_baseline"] = model
+    all_results.append({'model': name, 'stage': 'baseline', 'roc_auc': roc_auc, 'f1': f1, 'run_id': run_id})
     
-    new_run_id = run.info.run_id
+    print(f"ROC-AUC: {roc_auc:.4f}")
+
+# Train finetuned
+print("\n🔍 Finetuned models...")
+for name, base_model in baseline_models.items():
+    print(f"  {name}...", end=" ")
+    start = datetime.now()
     
-    print(f"\n📊 Métriques du nouveau modèle:")
-    print(f"   ROC-AUC: {roc_auc:.4f}")
-    print(f"   F1-Score: {f1:.4f}")
-    print(f"   Precision: {precision:.4f}")
-    print(f"   Recall: {recall:.4f}")
+    search = RandomizedSearchCV(base_model, search_spaces[name], n_iter=N_ITER, cv=CV_FOLDS, scoring='roc_auc', n_jobs=-1, random_state=42, verbose=0)
+    search.fit(X_train, y_train)
+    best_model = search.best_estimator_
+    
+    y_pred = best_model.predict(X_test)
+    y_proba = best_model.predict_proba(X_test)[:, 1]
+    
+    roc_auc = roc_auc_score(y_test, y_proba)
+    f1 = f1_score(y_test, y_pred)
+    duration = (datetime.now() - start).total_seconds()
+    
+    with mlflow.start_run(run_name=f"{name}_finetuned_retrain"):
+        mlflow.log_params({'model': name, 'stage': 'finetuned', 'retrain': True, **search.best_params_})
+        mlflow.log_metrics({'roc_auc': roc_auc, 'f1_score': f1, 'duration': duration})
+        mlflow.sklearn.log_model(best_model, "model")
+        run_id = mlflow.active_run().info.run_id
+    
+    trained_models[f"{name}_finetuned"] = best_model
+    all_results.append({'model': name, 'stage': 'finetuned', 'roc_auc': roc_auc, 'f1': f1, 'run_id': run_id})
+    
+    print(f"ROC-AUC: {roc_auc:.4f}")
+
+# Train Stacking
+print("\n🚀 Stacking ensemble...")
+estimators = [
+    ('lgbm', trained_models['LightGBM_finetuned']),
+    ('rf', trained_models['RandomForest_finetuned']),
+    ('cat', trained_models['CatBoost_finetuned']),
+    ('lr', trained_models['LogisticRegression_finetuned'])
+]
+
+meta_learner = LogisticRegression(penalty='elasticnet', C=0.5, l1_ratio=0.3, solver='saga', max_iter=1500, random_state=42, n_jobs=-1)
+stacking = StackingClassifier(estimators=estimators, final_estimator=meta_learner, cv=3, stack_method='predict_proba', n_jobs=-1)
+
+start = datetime.now()
+stacking.fit(X_train, y_train)
+y_pred = stacking.predict(X_test)
+y_proba = stacking.predict_proba(X_test)[:, 1]
+
+roc_auc_stack = roc_auc_score(y_test, y_proba)
+f1_stack = f1_score(y_test, y_pred)
+duration = (datetime.now() - start).total_seconds()
+
+with mlflow.start_run(run_name="Stacking_LR_retrain"):
+    mlflow.log_params({'model': 'Stacking_LR', 'stage': 'ensemble', 'retrain': True})
+    mlflow.log_metrics({'roc_auc': roc_auc_stack, 'f1_score': f1_stack, 'duration': duration})
+    mlflow.sklearn.log_model(stacking, "model")
+    stack_run_id = mlflow.active_run().info.run_id
+
+trained_models['Stacking_LR'] = stacking
+all_results.append({'model': 'Stacking_LR', 'stage': 'ensemble', 'roc_auc': roc_auc_stack, 'f1': f1_stack, 'run_id': stack_run_id})
+
+print(f"  Stacking_LR: ROC-AUC: {roc_auc_stack:.4f}")
 
 # ============================================================================
-# 5. COMPARAISON ET PROMOTION
+# 6. SÉLECTION DU MEILLEUR MODÈLE
 # ============================================================================
-print("\n🔍 Comparaison avec le modèle de production...")
+print("\n📊 ÉTAPE 6: Sélection du meilleur modèle")
+print("=" * 80)
 
-improvement = roc_auc - prod_roc_auc
+df_results = pd.DataFrame(all_results)
+best_idx = df_results['roc_auc'].idxmax()
+best_result = df_results.loc[best_idx]
+
+print(f"\n🏆 Meilleur modèle:")
+print(f"   Nom: {best_result['model']} ({best_result['stage']})")
+print(f"   ROC-AUC: {best_result['roc_auc']:.4f}")
+print(f"   F1-Score: {best_result['f1']:.4f}")
+
+# ============================================================================
+# 7. COMPARAISON ET PROMOTION
+# ============================================================================
+print("\n📊 ÉTAPE 7: Comparaison avec production")
+print("=" * 80)
+
+improvement = best_result['roc_auc'] - prod_roc_auc
 print(f"   Production ROC-AUC: {prod_roc_auc:.4f}")
-print(f"   Nouveau ROC-AUC: {roc_auc:.4f}")
-print(f"   Amélioration: {improvement:+.4f} ({improvement/prod_roc_auc*100:+.2f}%)")
+print(f"   Nouveau ROC-AUC: {best_result['roc_auc']:.4f}")
+print(f"   Amélioration: {improvement:+.4f} ({improvement/max(prod_roc_auc, 0.01)*100:+.2f}%)")
 
 if improvement > IMPROVEMENT_THRESHOLD:
-    print(f"\n✅ Amélioration significative détectée (>{IMPROVEMENT_THRESHOLD:.2%})")
-    print("   Promotion du nouveau modèle en production...")
+    print(f"\n✅ Amélioration significative (>{IMPROVEMENT_THRESHOLD:.2%})")
+    print("   Promotion du nouveau modèle...")
     
     try:
-        # Enregistrer le nouveau modèle dans le registry
-        model_uri = f"runs:/{new_run_id}/model"
-        mv = mlflow.register_model(model_uri, "BankChurnModel")
-        
-        # Promouvoir en production
-        client.transition_model_version_stage(
-            name="BankChurnModel",
-            version=mv.version,
-            stage="Production",
-            archive_existing_versions=True
-        )
-        
-        print(f"✅ Modèle promu en production (version {mv.version})")
-        
+        model_uri = f"runs:/{best_result['run_id']}/model"
+        mv = mlflow.register_model(model_uri, PRODUCTION_MODEL_NAME)
+        print(f"✅ Modèle enregistré (version {mv.version})")
     except Exception as e:
-        print(f"⚠️  Erreur lors de la promotion: {e}")
-        print("   Le modèle a été entraîné mais pas promu")
+        print(f"⚠️  Erreur promotion: {e}")
 else:
     print(f"\n⚠️  Amélioration insuffisante (<{IMPROVEMENT_THRESHOLD:.2%})")
-    print("   Le modèle de production actuel est conservé")
+    print("   Modèle de production conservé")
 
 print("\n" + "=" * 80)
 print("✅ RÉENTRAÎNEMENT TERMINÉ")
 print("=" * 80)
-print(f"📊 Nouveau modèle Run ID: {new_run_id}")
 print(f"🔗 MLflow UI: http://localhost:5000")
-print("=" * 80)
