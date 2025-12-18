@@ -65,11 +65,26 @@ pipeline {
                 script {
                     if (fileExists('trigger.txt')) {
                         echo '🚨 DRIFT DETECTED'
-                        currentBuild.result = 'UNSTABLE'
+                        env.DRIFT_DETECTED = 'true'
                     } else {
                         echo '✓ No drift'
+                        env.DRIFT_DETECTED = 'false'
                     }
                 }
+            }
+        }
+        
+        stage('Retrain Model') {
+            when {
+                expression { env.DRIFT_DETECTED == 'true' }
+            }
+            steps {
+                bat """
+                    echo ========================================
+                    echo RETRAINING MODEL
+                    echo ========================================
+                    "${PYTHON}" scripts/retrain_model.py
+                """
             }
         }
     }
