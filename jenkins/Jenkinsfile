@@ -112,6 +112,31 @@ pipeline {
                 }
             }
         }
+        
+        stage('DVC Versioning') {
+            when {
+                expression { currentBuild.result != 'FAILURE' }
+            }
+            steps {
+                bat """
+                    echo ========================================
+                    echo DVC VERSIONING
+                    echo ========================================
+                    
+                    REM Add production data to DVC
+                    dvc add data/production/bank_churn_prod.csv
+                    
+                    REM Commit DVC changes
+                    git add data/production/bank_churn_prod.csv.dvc .gitignore
+                    git commit -m "dvc: version production data after drift detection" || echo "No DVC changes to commit"
+                    
+                    REM Push to DVC remote (if configured)
+                    dvc push || echo "DVC remote not configured, skipping push"
+                    
+                    echo DVC versioning complete
+                """
+            }
+        }
     }
     
     post {
