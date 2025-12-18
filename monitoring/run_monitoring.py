@@ -58,6 +58,17 @@ print(f"✅ Données de référence: {df_reference.shape[0]:,} lignes")
 df_production = pd.read_csv(PRODUCTION_DATA)
 print(f"✅ Données de production: {df_production.shape[0]:,} lignes")
 
+# OPTIMISATION: Échantillonner pour accélérer l'analyse
+# Evidently est lent sur de gros datasets, on prend un échantillon représentatif
+SAMPLE_SIZE = 5000
+if len(df_reference) > SAMPLE_SIZE:
+    df_reference = df_reference.sample(n=SAMPLE_SIZE, random_state=42)
+    print(f"⚡ Échantillon référence: {len(df_reference):,} lignes (pour performance)")
+
+if len(df_production) > SAMPLE_SIZE:
+    df_production = df_production.sample(n=SAMPLE_SIZE, random_state=42)
+    print(f"⚡ Échantillon production: {len(df_production):,} lignes (pour performance)")
+
 # Sélectionner les colonnes communes (toutes, pas seulement numériques)
 common_cols = [col for col in df_reference.columns if col in df_production.columns]
 
