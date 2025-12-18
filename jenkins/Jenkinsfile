@@ -18,9 +18,13 @@ pipeline {
                     REM Créer les dossiers nécessaires
                     if not exist data mkdir data
                     if not exist data\\production mkdir data\\production
+                    if not exist notebooks\\processors mkdir notebooks\\processors
                     
                     REM Copier le dataset source
                     copy "C:\\Users\\Tech House\\Desktop\\3eme\\mlops\\mlops\\MLOps_Bank_Churn\\data\\bank_customer_churn.csv" "data\\bank_customer_churn.csv" /Y
+                    
+                    REM Copier les processors et données preprocessées
+                    copy "C:\\Users\\Tech House\\Desktop\\3eme\\mlops\\mlops\\MLOps_Bank_Churn\\notebooks\\processors\\*.pkl" "notebooks\\processors\\" /Y
                     
                     REM Générer les batches avec transformations
                     "${PYTHON}" scripts/split_dataset.py
