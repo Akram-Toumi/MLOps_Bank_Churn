@@ -135,24 +135,31 @@ try:
             # Charger le modèle
             prod_model = mlflow.sklearn.load_model(prod_model_uri)
             
-            # Récupérer les métriques
+            # Évaluer le modèle sur les données ACTUELLES (Fair Comparison)
+            print(f"   Évaluation sur le test set actuel...")
+            y_prod_proba = prod_model.predict_proba(X_test)[:, 1]
+            prod_roc_auc = roc_auc_score(y_test, y_prod_proba)
+            
+            # Récupérer les métriques historiques (juste pour info)
             prod_run = client.get_run(prod_run_id)
             prod_metrics = prod_run.data.metrics
-            prod_roc_auc = prod_metrics.get('roc_auc', prod_metrics.get('test_roc_auc', 0))
+            prod_historical_auc = prod_metrics.get('roc_auc', prod_metrics.get('test_roc_auc', 0))
             
             print(f"✅ Modèle de production chargé")
             print(f"   Nom: {PRODUCTION_MODEL_NAME}")
             print(f"   Version: {latest_version.version}")
-            print(f"   ROC-AUC: {prod_roc_auc:.4f}")
+            print(f"   ROC-AUC (Historique): {prod_historical_auc:.4f}")
+            print(f"   ROC-AUC (Actuel): {prod_roc_auc:.4f}")
         else:
             print("⚠️  Aucune version trouvée")
-            prod_roc_auc = 0
+            prod_roc_auc = 0.5  # Baseline aléatoire
+
     else:
         print(f"⚠️  Modèle '{PRODUCTION_MODEL_NAME}' non trouvé")
-        prod_roc_auc = 0
+        prod_roc_auc = 0.5
 except Exception as e:
     print(f"⚠️  Erreur: {e}")
-    prod_roc_auc = 0
+    prod_roc_auc = 0.5
 
 # ============================================================================
 # 5. ENTRAÎNEMENT DES MODÈLES
@@ -288,7 +295,8 @@ print("\n📊 ÉTAPE 7: Comparaison avec production")
 print("=" * 80)
 
 improvement = best_result['roc_auc'] - prod_roc_auc
-print(f"   Production ROC-AUC: {prod_roc_auc:.4f}")
+improvement = best_result['roc_auc'] - prod_roc_auc
+print(f"   Production ROC-AUC (Sur Test Set): {prod_roc_auc:.4f}")
 print(f"   Nouveau ROC-AUC: {best_result['roc_auc']:.4f}")
 print(f"   Amélioration: {improvement:+.4f} ({improvement/max(prod_roc_auc, 0.01)*100:+.2f}%)")
 
