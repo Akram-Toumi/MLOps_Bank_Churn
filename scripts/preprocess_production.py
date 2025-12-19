@@ -33,6 +33,10 @@ class ProductionDataPreprocessor:
             print(f"⚠️  Impossible de charger les processors: {e}")
             return False
     
+    def transform(self, df):
+        """Alias for preprocess to maintain sklearn compatibility"""
+        return self.preprocess(df)
+    
     def preprocess(self, df):
         """Apply full preprocessing pipeline"""
         print("\n" + "="*80)
