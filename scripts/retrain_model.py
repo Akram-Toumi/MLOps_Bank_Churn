@@ -363,7 +363,7 @@ with mlflow.start_run(run_name="Stacking_LR_retrain"):
     mlflow.sklearn.log_model(stacking, "model")
     stack_run_id = mlflow.active_run().info.run_id
 
-trained_models['Stacking_LR'] = stacking
+trained_models['Stacking_LR_ensemble'] = stacking
 all_results.append({'model': 'Stacking_LR', 'stage': 'ensemble', 'roc_auc': roc_auc_stack, 'f1': f1_stack, 'run_id': stack_run_id})
 
 print(f"  Stacking_LR: ROC-AUC: {roc_auc_stack:.4f}")
