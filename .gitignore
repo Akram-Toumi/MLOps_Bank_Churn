@@ -28,7 +28,7 @@ pip-wheel-metadata/
 # DATA & MODELS (DVC MANAGED)
 # ----------------------------------------
 data/
-data/*
+!data/production/*.dvc
 !data/.gitkeep
 model/
 model/*
@@ -41,8 +41,8 @@ notebooks/*.pkl
 
 
 # DVC
-*.dvc
-.dvc/
+# *.dvc (Managed by git)
+# .dvc/ (Managed by git)
 .dvcignore
 .cache/
 # Prevent large dataset download files

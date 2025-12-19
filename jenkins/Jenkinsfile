@@ -220,6 +220,10 @@ pipeline {
                     git config user.email "jenkins@mlops.local"
                     git config user.name "Jenkins Pipeline"
                     
+                    REM Configure DVC Local Remote (Simulation)
+                    if not exist "C:\\Temp\\dvc_storage" mkdir "C:\\Temp\\dvc_storage"
+                    "${DVC}" remote add -d localstorage "C:\\Temp\\dvc_storage" -f
+                    
                     REM Add to DVC
                     "${DVC}" add data/production/bank_churn_prod.csv || echo "DVC add failed or already tracked"
                     
