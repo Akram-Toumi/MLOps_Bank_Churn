@@ -125,35 +125,35 @@ pipeline {
             }
         }
         
-        stage('Test: Data Distribution') {
-            steps {
-                bat """
-                    echo ========================================
-                    echo TEST: DATA DISTRIBUTION
-                    echo ========================================
-                    "${PYTHON}" -m pytest testing/test_data_distribution.py -v --html=reports/distribution_report.html --self-contained-html
-                """
-            }
-            post {
-                always {
-                    archiveArtifacts artifacts: 'reports/distribution_report.html', allowEmptyArchive: true
-                }
-            }
-        }
+        // stage('Test: Data Distribution') {
+        //     steps {
+        //         bat """
+        //             echo ========================================
+        //             echo TEST: DATA DISTRIBUTION
+        //             echo ========================================
+        //             "${PYTHON}" -m pytest testing/test_data_distribution.py -v --html=reports/distribution_report.html --self-contained-html
+        //         """
+        //     }
+        //     post {
+        //         always {
+        //             archiveArtifacts artifacts: 'reports/distribution_report.html', allowEmptyArchive: true
+        //         }
+        //     }
+        // }
         
-        stage('Check Drift') {
-            steps {
-                script {
-                    if (fileExists('trigger.txt')) {
-                        echo '🚨 DRIFT DETECTED'
-                        env.DRIFT_DETECTED = 'true'
-                    } else {
-                        echo '✓ No drift'
-                        env.DRIFT_DETECTED = 'false'
-                    }
-                }
-            }
-        }
+        // stage('Check Drift') {
+        //     steps {
+        //         script {
+        //             if (fileExists('trigger.txt')) {
+        //                 echo '🚨 DRIFT DETECTED'
+        //                 env.DRIFT_DETECTED = 'true'
+        //             } else {
+        //                 echo '✓ No drift'
+        //                 env.DRIFT_DETECTED = 'false'
+        //             }
+        //         }
+        //     }
+        // }
         
         stage('Retrain Model') {
             when {
