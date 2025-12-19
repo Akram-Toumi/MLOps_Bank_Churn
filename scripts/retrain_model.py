@@ -36,6 +36,101 @@ IMPROVEMENT_THRESHOLD = 0.02  # 2% ROC-AUC improvement required
 N_ITER = 5  # Reduced for faster retraining
 CV_FOLDS = 3
 
+
+# ============================================================================
+# UTILITY FUNCTIONS
+# ============================================================================
+
+def register_to_mlflow(model, model_name, best_row, best_run_id, best_roc_auc, should_replace, current_model_version=None):
+    """Register model to MLflow Model Registry (Logic accepted from binome)"""
+    
+    client = mlflow.tracking.MlflowClient()
+    
+    if should_replace:
+        print(f"\n🔄 Registering new model to MLflow...")
+        
+        try:
+            # Note: Model is already logged in 'best_run_id', we just need to register it from there
+            model_uri = f"runs:/{best_run_id}/model"
+            
+            print(f"✅ Registering model from URI: {model_uri}")
+            mv = mlflow.register_model(model_uri, model_name)
+            
+            # Wait for registration? usually returns version immediately
+            new_version = mv.version
+            print(f"   New version: {new_version}")
+            
+            # Archive old version in Production (if exists)
+            if current_model_version:
+                print(f"\n📦 Archiving old version...")
+                try:
+                    client.transition_model_version_stage(
+                        name=model_name,
+                        version=current_model_version.version,
+                        stage="Archived",
+                        archive_existing_versions=False
+                    )
+                    print(f"✅ Version {current_model_version.version} archived")
+                except Exception as e:
+                    print(f"⚠️  Could not archive old version: {e}")
+            
+            # Transition new version to Production
+            print(f"\n🚀 Transitioning to Production...")
+            client.transition_model_version_stage(
+                name=model_name,
+                version=new_version,
+                stage="Production",
+                archive_existing_versions=True
+            )
+            
+            print(f"✅ Model promoted to Production")
+            print(f"   Stage: Production")
+            print(f"   Version: {new_version}")
+            
+            # Add metadata
+            try:
+                improvement_text = ""
+                if current_model_version:
+                    current_run = client.get_run(current_model_version.run_id)
+                    current_roc_auc = current_run.data.metrics.get('roc_auc', 0)
+                    roc_auc_diff = best_roc_auc - current_roc_auc
+                    improvement_pct = (roc_auc_diff / current_roc_auc) * 100 if current_roc_auc > 0 else 0
+                    improvement_text = f"\\n- Improvement over v{current_model_version.version}: +{roc_auc_diff:.4f} ({improvement_pct:+.2f}%)"
+                
+                client.update_model_version(
+                    name=model_name,
+                    version=new_version,
+                    description=f"Best performing churn prediction model\\n- Model: {best_row['model']}\\n- Stage: {best_row['stage']}\\n- ROC-AUC: {best_roc_auc:.4f}\\n- F1-Score: {best_row['f1']:.4f}\\n- Trained: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}{improvement_text}"
+                )
+                
+                # Add tags
+                client.set_model_version_tag(
+                    name=model_name,
+                    version=new_version,
+                    key="model_type",
+                    value=best_row['model']
+                )
+                
+                client.set_model_version_tag(
+                    name=model_name,
+                    version=new_version,
+                    key="roc_auc",
+                    value=str(round(best_roc_auc, 4))
+                )
+                
+                print(f"✅ Metadata added (description + tags)")
+            except Exception as e:
+                print(f"⚠️  Could not add metadata: {e}")
+                
+            return new_version
+                
+        except Exception as e:
+            print(f"⚠️  Error during registration: {e}")
+            return None
+    else:
+        print(f"\n⏭️  New model not registered to Production")
+        return None
+
 print("=" * 80)
 print("RÉENTRAÎNEMENT AUTOMATIQUE - PIPELINE COMPLET")
 print("=" * 80)
@@ -304,12 +399,34 @@ if improvement > IMPROVEMENT_THRESHOLD:
     print(f"\n✅ Amélioration significative (>{IMPROVEMENT_THRESHOLD:.2%})")
     print("   Promotion du nouveau modèle...")
     
-    try:
-        model_uri = f"runs:/{best_result['run_id']}/model"
-        mv = mlflow.register_model(model_uri, PRODUCTION_MODEL_NAME)
-        print(f"✅ Modèle enregistré (version {mv.version})")
-    except Exception as e:
-        print(f"⚠️  Erreur promotion: {e}")
+    # Identify current model version object if it exists
+    current_version_obj = None
+    if prod_roc_auc > 0: # Means we found a production model
+         try:
+            versions = client.get_latest_versions(PRODUCTION_MODEL_NAME, stages=["Production"])
+            if versions:
+                current_version_obj = versions[0]
+         except:
+            pass
+    
+    # Use the new robust registration function
+    # Note: best_result has 'f1' key, but script used 'f1_score'. My dict has 'f1'.
+    
+    # Load best model from memory to pass if needed, but we use URI from run_id
+    best_model_obj = trained_models[f"{best_result['model']}_{best_result['stage']}"]
+    
+    register_to_mlflow(
+        model=best_model_obj,
+        model_name=PRODUCTION_MODEL_NAME,
+        best_row=best_result,
+        best_run_id=best_result['run_id'],
+        best_roc_auc=best_result['roc_auc'],
+        should_replace=True,
+        current_model_version=current_version_obj
+    )
+
+    print(f"✅ Modèle enregistré et promu (version Production)")
+
 else:
     print(f"\n⚠️  Amélioration insuffisante (<{IMPROVEMENT_THRESHOLD:.2%})")
     print("   Modèle de production conservé")
