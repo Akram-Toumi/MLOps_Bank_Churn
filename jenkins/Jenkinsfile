@@ -1,0 +1,222 @@
+pipeline {
+    agent any
+    
+    environment {
+        PYTHONUTF8 = "1"
+        PYTHON = "C:\\Users\\Tech House\\AppData\\Local\\Programs\\Python\\Python312\\python.exe"
+        MLFLOW_TRACKING_URI = "sqlite:///mlflow.db"
+    }
+    
+    stages {
+        stage('Setup') {
+            steps {
+                bat """
+                    echo ========================================
+                    echo SETUP - PREPARATION
+                    echo ========================================
+                    
+                    REM Créer les dossiers nécessaires
+                    if not exist data mkdir data
+                    if not exist data\\production mkdir data\\production
+                    if not exist notebooks\\processors mkdir notebooks\\processors
+                    if not exist reports mkdir reports
+                    
+                    REM Copier le dataset source
+                    copy "C:\\Users\\Tech House\\Desktop\\3eme\\mlops\\mlops\\MLOps_Bank_Churn\\data\\bank_customer_churn.csv" "data\\bank_customer_churn.csv" /Y
+                    
+                    REM Copier les processors et données preprocessées
+                    copy "C:\\Users\\Tech House\\Desktop\\3eme\\mlops\\mlops\\MLOps_Bank_Churn\\notebooks\\processors\\*.pkl" "notebooks\\processors\\" /Y
+                    
+                    REM Générer les batches avec transformations
+                    "${PYTHON}" scripts/split_dataset.py
+                    
+                    echo Setup OK
+                """
+            }
+        }
+        
+        stage('Install Dependencies') {
+            steps {
+                bat """
+                    echo ========================================
+                    echo INSTALLATION DEPENDENCIES
+                    echo ========================================
+                    "${PYTHON}" -m pip install --quiet pandas numpy scipy scikit-learn
+                    "${PYTHON}" -m pip install --quiet pytest pytest-html deepchecks
+                    "${PYTHON}" -m pip install --quiet xgboost lightgbm catboost
+                    echo Dependencies OK
+                """
+            }
+        }
+        
+        stage('Generate Production Data') {
+            steps {
+                bat """
+                    echo ========================================
+                    echo GENERATION DONNEES PRODUCTION
+                    echo ========================================
+                    "${PYTHON}" scripts/generate_prod_data.py batch1
+                """
+            }
+        }
+        
+        stage('Test: Data Integrity') {
+            steps {
+                bat """
+                    echo ========================================
+                    echo TEST: DATA INTEGRITY
+                    echo ========================================
+                    "${PYTHON}" -m pytest testing/test_data_integrity.py -v --html=reports/data_integrity_report.html --self-contained-html
+                """
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'reports/data_integrity_report.html', allowEmptyArchive: true
+                }
+            }
+        }
+        
+        stage('Preprocessing') {
+            steps {
+                bat """
+                    echo ========================================
+                    echo PREPROCESSING PRODUCTION DATA
+                    echo ========================================
+                    "${PYTHON}" scripts/preprocess_production.py data/production/bank_churn_prod.csv data/production/bank_churn_prod_processed.csv
+                """
+            }
+        }
+        
+        stage('Test: Preprocessing') {
+            steps {
+                bat """
+                    echo ========================================
+                    echo TEST: PREPROCESSING
+                    echo ========================================
+                    "${PYTHON}" -m pytest testing/test_preprocessing.py -v --html=reports/preprocessing_report.html --self-contained-html
+                """
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'reports/preprocessing_report.html', allowEmptyArchive: true
+                }
+            }
+        }
+        
+        stage('Monitoring & Drift Detection') {
+            steps {
+                bat """
+                    echo ========================================
+                    echo MONITORING + DRIFT DETECTION
+                    echo ========================================
+                    "${PYTHON}" monitoring/run_monitoring.py
+                """
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'monitoring/*.html, monitoring/*.json', allowEmptyArchive: true
+                }
+            }
+        }
+        
+        stage('Test: Data Distribution') {
+            steps {
+                bat """
+                    echo ========================================
+                    echo TEST: DATA DISTRIBUTION
+                    echo ========================================
+                    "${PYTHON}" -m pytest testing/test_data_distribution.py -v --html=reports/distribution_report.html --self-contained-html
+                """
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'reports/distribution_report.html', allowEmptyArchive: true
+                }
+            }
+        }
+        
+        stage('Check Drift') {
+            steps {
+                script {
+                    if (fileExists('trigger.txt')) {
+                        echo '🚨 DRIFT DETECTED'
+                        env.DRIFT_DETECTED = 'true'
+                    } else {
+                        echo '✓ No drift'
+                        env.DRIFT_DETECTED = 'false'
+                    }
+                }
+            }
+        }
+        
+        stage('Retrain Model') {
+            when {
+                expression { env.DRIFT_DETECTED == 'true' }
+            }
+            steps {
+                bat """
+                    echo ========================================
+                    echo RETRAINING - FULL PIPELINE
+                    echo ========================================
+                    "${PYTHON}" scripts/retrain_model.py
+                """
+            }
+        }
+        
+        stage('Test: Model Evaluation') {
+            when {
+                expression { env.DRIFT_DETECTED == 'true' }
+            }
+            steps {
+                bat """
+                    echo ========================================
+                    echo TEST: MODEL EVALUATION
+                    echo ========================================
+                    "${PYTHON}" -m pytest testing/ -v --html=reports/full_test_report.html --self-contained-html
+                """
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'reports/full_test_report.html', allowEmptyArchive: true
+                    publishHTML([
+                        allowMissing: true,
+                        alwaysLinkToLastBuild: true,
+                        keepAll: true,
+                        reportDir: 'reports',
+                        reportFiles: 'full_test_report.html',
+                        reportName: 'Test Report'
+                    ])
+                }
+            }
+        }
+        
+        stage('DVC Versioning') {
+            when {
+                expression { currentBuild.result != 'FAILURE' }
+            }
+            steps {
+                bat """
+                    echo ========================================
+                    echo DVC VERSIONING
+                    echo ========================================
+                    dvc add data/production/bank_churn_prod.csv || echo "DVC add failed or already tracked"
+                    git add data/production/bank_churn_prod.csv.dvc .gitignore || echo "Git add failed"
+                    git commit -m "dvc: version production data [skip ci]" || echo "Nothing to commit"
+                    dvc push || echo "DVC remote not configured"
+                """
+            }
+        }
+    }
+    
+    post {
+        always {
+            echo 'Pipeline completed'
+        }
+        success {
+            echo '✅ Build successful'
+        }
+        failure {
+            echo '❌ Build failed'
+        }
+    }
+}
