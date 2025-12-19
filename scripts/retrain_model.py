@@ -26,7 +26,7 @@ sys.path.append('scripts')
 from preprocess_production import ProductionDataPreprocessor
 
 # Configuration
-MLFLOW_TRACKING_URI = "sqlite:///mlflow.db"
+MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "sqlite:///mlflow.db")
 EXPERIMENT_NAME = "Bank_Churn_Retraining"
 PRODUCTION_MODEL_NAME = "churn_prediction_Stacking_LR"
 INITIAL_TRAINING_DATA = "notebooks/processors/preprocessed_data.pkl"
