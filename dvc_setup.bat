@@ -34,7 +34,7 @@ echo 🔧 Configuration du remote storage local...
 if not exist "dvc_storage" mkdir dvc_storage
 
 :: Ajouter le remote local
-dvc remote add -d local_storage ./dvc_storage --force
+dvc remote add -d local_storage ./dvc_storage --force 2>nul || echo Remote deja configure
 
 echo ✅ Remote local configuré: ./dvc_storage
 
@@ -113,4 +113,5 @@ echo 💡 Prochaine étape: Exécuter le monitoring
 echo    python monitoring/run_monitoring.py
 echo ================================================================================
 
+if "%1"=="--no-pause" goto :eof
 pause
