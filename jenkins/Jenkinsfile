@@ -4,6 +4,7 @@ pipeline {
     environment {
         PYTHONUTF8 = "1"
         PYTHON = "C:\\Users\\Tech House\\AppData\\Local\\Programs\\Python\\Python312\\python.exe"
+        DVC = "C:\\Users\\Tech House\\AppData\\Local\\Programs\\Python\\Python312\\Scripts\\dvc.exe"
         MLFLOW_TRACKING_URI = "http://127.0.0.1:5000"
     }
     
@@ -50,6 +51,7 @@ pipeline {
                     "${PYTHON}" -m pip install --quiet numpy==1.26.4 pandas scipy scikit-learn
                     "${PYTHON}" -m pip install --quiet pytest pytest-html deepchecks
                     "${PYTHON}" -m pip install --quiet xgboost lightgbm catboost
+                    "${PYTHON}" -m pip install --quiet dvc
                     echo Dependencies OK
                 """
             }
@@ -213,10 +215,20 @@ pipeline {
                     echo ========================================
                     echo DVC VERSIONING
                     echo ========================================
-                    dvc add data/production/bank_churn_prod.csv || echo "DVC add failed or already tracked"
+                    
+                    REM Configure Git Identity for Jenkins
+                    git config user.email "jenkins@mlops.local"
+                    git config user.name "Jenkins Pipeline"
+                    
+                    REM Add to DVC
+                    "${DVC}" add data/production/bank_churn_prod.csv || echo "DVC add failed or already tracked"
+                    
+                    REM Commit DVC file
                     git add data/production/bank_churn_prod.csv.dvc .gitignore || echo "Git add failed"
                     git commit -m "dvc: version production data [skip ci]" || echo "Nothing to commit"
-                    dvc push || echo "DVC remote not configured"
+                    
+                    REM Push DVC
+                    "${DVC}" push || echo "DVC remote not configured"
                 """
             }
         }
