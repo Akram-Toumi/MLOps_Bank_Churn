@@ -123,6 +123,12 @@ pipeline {
                     archiveArtifacts artifacts: 'monitoring/*.html, monitoring/*.json', allowEmptyArchive: true
                 }
             }
+            script {
+                if (fileExists('trigger.txt')) {
+                    env.DRIFT_DETECTED = 'true'
+                } else {
+                    env.DRIFT_DETECTED = 'false'
+                }
         }
         
         // stage('Test: Data Distribution') {
@@ -225,4 +231,5 @@ pipeline {
             echo '❌ Build failed'
         }
     }
+}
 }
