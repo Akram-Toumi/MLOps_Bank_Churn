@@ -11,7 +11,13 @@ import sys
 import mlflow
 import mlflow.sklearn
 from mlflow.tracking import MlflowClient
+import mlflow
+import mlflow.sklearn
+from mlflow.tracking import MlflowClient
 from datetime import datetime
+from pathlib import Path
+import shutil
+import json
 from sklearn.model_selection import train_test_split, RandomizedSearchCV
 from sklearn.metrics import roc_auc_score, f1_score, precision_score, recall_score, accuracy_score
 from sklearn.linear_model import LogisticRegression
@@ -26,12 +32,14 @@ sys.path.append('scripts')
 from preprocess_production import ProductionDataPreprocessor
 
 # Configuration
-MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "sqlite:///mlflow.db")
+# Configuration
+MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://127.0.0.1:5000")
 EXPERIMENT_NAME = "Bank_Churn_Retraining"
 PRODUCTION_MODEL_NAME = "churn_prediction_Stacking_LR"
 INITIAL_TRAINING_DATA = "notebooks/processors/preprocessed_data.pkl"
 PRODUCTION_DATA_RAW = "data/production/bank_churn_prod.csv"
 PROCESSOR_DIR = "notebooks/processors"
+MODEL_REGISTRY_DIR = Path("notebooks/processors/model_registry")
 IMPROVEMENT_THRESHOLD = 0.02  # 2% ROC-AUC improvement required
 N_ITER = 5  # Reduced for faster retraining
 CV_FOLDS = 3
@@ -127,9 +135,46 @@ def register_to_mlflow(model, model_name, best_row, best_run_id, best_roc_auc, s
         except Exception as e:
             print(f"⚠️  Error during registration: {e}")
             return None
+        return None
     else:
         print(f"\n⏭️  New model not registered to Production")
         return None
+
+def register_model_local(model, model_name, version="1.0.0", stage="production", metrics=None, run_id=None):
+    """Register a model in the local registry (filesystem)"""
+    MODEL_REGISTRY_DIR.mkdir(parents=True, exist_ok=True)
+    
+    # Create structure
+    model_dir = MODEL_REGISTRY_DIR / model_name.replace(" ", "_")
+    model_dir.mkdir(exist_ok=True)
+    
+    version_dir = model_dir / version
+    version_dir.mkdir(exist_ok=True)
+    
+    # Save model
+    model_path = version_dir / "model.pkl"
+    with open(model_path, 'wb') as f:
+        pickle.dump(model, f)
+    
+    # Metadata
+    metadata = {
+        "model_name": model_name,
+        "version": version,
+        "stage": stage,
+        "registered_at": datetime.now().isoformat(),
+        "metrics": metrics or {},
+        "run_id": run_id
+    }
+    
+    with open(version_dir / "metadata.json", 'w') as f:
+        json.dump(metadata, f, indent=2)
+    
+    # Production link
+    if stage == "production":
+        prod_path = model_dir / "production.pkl"
+        shutil.copy(model_path, prod_path)
+    
+    return str(model_path)
 
 print("=" * 80)
 print("RÉENTRAÎNEMENT AUTOMATIQUE - PIPELINE COMPLET")
@@ -425,7 +470,32 @@ if improvement > IMPROVEMENT_THRESHOLD:
         current_model_version=current_version_obj
     )
 
-    print(f"✅ Modèle enregistré et promu (version Production)")
+    print(f"✅ Modèle enregistré et promu dans MLflow (version Production)")
+
+    # ---------------------------------------------------------
+    # REGISTER TO LOCAL REGISTRY
+    # ---------------------------------------------------------
+    
+    # Calculate metrics for local registry format
+    # Note: best_result uses keys 'roc_auc', 'f1', need to map if necessary or pass as is
+    local_metrics = {
+        'roc_auc': best_result['roc_auc'],
+        'f1_score': best_result['f1']
+    }
+    
+    registry_name = f"Best_Churn_{best_result['model']}"
+    print(f"\n📦 Enregistrement dans le registre local...")
+    
+    local_path = register_model_local(
+        model=best_model_obj,
+        model_name=registry_name,
+        version="1.0.0", # Simplified versioning for local, or could implement increment logic
+        stage="production",
+        metrics=local_metrics,
+        run_id=best_result['run_id']
+    )
+    
+    print(f"✅ Modèle sauvegardé localement: {local_path}")
 
 else:
     print(f"\n⚠️  Amélioration insuffisante (<{IMPROVEMENT_THRESHOLD:.2%})")
