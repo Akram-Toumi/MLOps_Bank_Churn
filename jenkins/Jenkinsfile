@@ -27,6 +27,12 @@ pipeline {
                     REM Copier les processors et données preprocessées
                     copy "C:\\Users\\Tech House\\Desktop\\3eme\\mlops\\mlops\\MLOps_Bank_Churn\\notebooks\\processors\\*.pkl" "notebooks\\processors\\" /Y
                     
+                    REM Créer le preprocessor.pkl si nécessaire
+                    if not exist "notebooks\\processors\\preprocessor.pkl" (
+                        echo Creating preprocessor.pkl...
+                        "${PYTHON}" scripts/create_preprocessor.py
+                    )
+                    
                     REM Générer les batches avec transformations
                     "${PYTHON}" scripts/split_dataset.py
                     
