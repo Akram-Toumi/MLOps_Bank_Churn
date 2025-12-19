@@ -27,33 +27,30 @@ pip-wheel-metadata/
 # ----------------------------------------
 # DATA & MODELS (DVC MANAGED)
 # ----------------------------------------
+
+# Ignore all data by default
 data/
-!data/production/*.dvc
+
+# BUT keep DVC pointer files
+!data/**/*.dvc
+
+# Keep folder structure
 !data/.gitkeep
+
+# Ignore models but keep structure
 model/
-model/*
+!model/**/*.dvc
 !model/.gitkeep
+
+# Monitoring & notebooks data
 monitoring/data/
 notebooks/data/
 notebooks/processors/
 notebooks/*.pkl
+
+# Binary artifacts
 *.pkl
 
-
-# DVC
-# *.dvc (Managed by git)
-# .dvc/ (Managed by git)
-.dvcignore
-.cache/
-# Prevent large dataset download files
-*.zip
-*.tar
-*.tar.gz
-*.h5
-*.csv
-*.tsv
-*.jsonl
-*.parquet
 # ----------------------------------------
 # FASTAPI / STREAMLIT
 # ----------------------------------------
