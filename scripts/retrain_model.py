@@ -58,38 +58,43 @@ print(f"✅ Données preprocessées: {df_prod_processed.shape}")
 print("\n📊 ÉTAPE 2: Combinaison avec données d'entraînement")
 print("=" * 80)
 
+# Charger les données initiales (SANS SMOTE)
 with open(INITIAL_TRAINING_DATA, 'rb') as f:
     initial_data = pickle.load(f)
 
-X_train_initial = initial_data['X_train']
-y_train_initial = initial_data['y_train']
+# Utiliser X_test et y_test (données non-SMOTE) au lieu de X_train
+X_train_initial = initial_data['X_test']  # Données de test = non-SMOTE
+y_train_initial = initial_data['y_test']
 
-print(f"Données initiales: {X_train_initial.shape}")
+print(f"Données initiales (non-SMOTE): {X_train_initial.shape}")
 print(f"Nouvelles données: {df_prod_processed.shape}")
 
 # Séparer target des nouvelles données si présente
 if 'Churn Flag' in df_prod_processed.columns:
     X_prod = df_prod_processed.drop('Churn Flag', axis=1)
     y_prod = df_prod_processed['Churn Flag']
+    print(f"✅ Target trouvée dans production data")
 else:
-    print("⚠️  Pas de target dans les données de production, skip")
-    X_prod = df_prod_processed
+    print("⚠️  Pas de target dans les données de production")
+    print("   Utilisation uniquement des données initiales pour réentraînement")
+    X_prod = None
     y_prod = None
 
 # Aligner les colonnes
-common_cols = list(set(X_train_initial.columns) & set(X_prod.columns))
+common_cols = list(set(X_train_initial.columns) & set(X_prod.columns if X_prod is not None else X_train_initial.columns))
 X_train_initial = X_train_initial[common_cols]
-X_prod = X_prod[common_cols]
 
-# Combiner
-if y_prod is not None:
+# Combiner si on a des données de production avec target
+if X_prod is not None and y_prod is not None:
+    X_prod = X_prod[common_cols]
     X_combined = pd.concat([X_train_initial, X_prod], ignore_index=True)
     y_combined = pd.concat([y_train_initial, y_prod], ignore_index=True)
+    print(f"✅ Données combinées: {X_combined.shape}")
 else:
     X_combined = X_train_initial
     y_combined = y_train_initial
+    print(f"✅ Utilisation données initiales uniquement: {X_combined.shape}")
 
-print(f"✅ Données combinées: {X_combined.shape}")
 print(f"   Churn rate: {y_combined.mean():.2%}")
 
 # Split train/test
