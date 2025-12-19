@@ -41,7 +41,7 @@ pipeline {
                     echo ========================================
                     echo INSTALLATION DEPENDENCIES
                     echo ========================================
-                    "${PYTHON}" -m pip install --quiet pandas numpy scipy scikit-learn
+                    "${PYTHON}" -m pip install --quiet numpy==1.26.4 pandas scipy scikit-learn
                     "${PYTHON}" -m pip install --quiet pytest pytest-html deepchecks
                     "${PYTHON}" -m pip install --quiet xgboost lightgbm catboost
                     echo Dependencies OK
