@@ -220,11 +220,19 @@ pipeline {
                     git config user.email "jenkins@mlops.local"
                     git config user.name "Jenkins Pipeline"
                     
-                    REM Update PATH to include Python Scripts (where dvc.exe is)
-                    set PATH=%PATH%;C:\\Users\\Tech House\\AppData\\Local\\Programs\\Python\\Python312\\Scripts
+                    REM Configure DVC Local Remote (Simulation)
+                    if not exist "C:\\Temp\\dvc_storage" mkdir "C:\\Temp\\dvc_storage"
+                    "${DVC}" remote add -d localstorage "C:\\Temp\\dvc_storage" -f
                     
-                    REM Run DVC Setup Script in CI mode
-                    call dvc_setup.bat --no-pause
+                    REM Add to DVC
+                    "${DVC}" add data/production/bank_churn_prod.csv || echo "DVC add failed or already tracked"
+                    
+                    REM Commit DVC file
+                    git add data/production/bank_churn_prod.csv.dvc .gitignore || echo "Git add failed"
+                    git commit -m "dvc: version production data [skip ci]" || echo "Nothing to commit"
+                    
+                    REM Push DVC
+                    "${DVC}" push || echo "DVC remote not configured"
                 """
             }
         }
