@@ -472,6 +472,11 @@ if improvement > IMPROVEMENT_THRESHOLD:
 
     print(f"✅ Modèle enregistré et promu dans MLflow (version Production)")
 
+    # Set environment flag for Jenkins deployment trigger
+    with open("model_promoted.txt", "w") as f:
+        f.write("true")
+    print("✅ Flag MODEL_PROMOTED créé pour déclenchement du déploiement")
+
     # ---------------------------------------------------------
     # REGISTER TO LOCAL REGISTRY
     # ---------------------------------------------------------
@@ -500,6 +505,10 @@ if improvement > IMPROVEMENT_THRESHOLD:
 else:
     print(f"\n⚠️  Amélioration insuffisante (<{IMPROVEMENT_THRESHOLD:.2%})")
     print("   Modèle de production conservé")
+    
+    # No promotion, set flag to false
+    with open("model_promoted.txt", "w") as f:
+        f.write("false")
 
 print("\n" + "=" * 80)
 print("✅ RÉENTRAÎNEMENT TERMINÉ")

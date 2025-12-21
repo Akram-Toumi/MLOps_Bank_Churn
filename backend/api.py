@@ -453,14 +453,32 @@ async def health_check():
     """
     Endpoint de vérification de santé
     Vérifie que le modèle est chargé et prêt
+    Retourne également la version du modèle déployé
     """
     if model is None:
         raise HTTPException(status_code=503, detail="Modèle non chargé")
     
+    # Try to load deployment metadata if available
+    deployment_metadata = {}
+    try:
+        metadata_path = Path(__file__).parent / "models" / "model_metadata.json"
+        if metadata_path.exists():
+            import json
+            with open(metadata_path, 'r') as f:
+                deployment_metadata = json.load(f)
+    except Exception as e:
+        print(f"Could not load deployment metadata: {e}")
+    
     return {
         "status": "healthy",
         "model_loaded": True,
-        "mlflow_uri": MLFLOW_TRACKING_URI
+        "model_info": {
+            "name": model_info.get("model_name", "unknown"),
+            "file": model_info.get("model_file", "unknown"),
+            "version": deployment_metadata.get("version", "unknown"),
+            "deployed_at": deployment_metadata.get("deployed_at", "unknown"),
+            "metrics": deployment_metadata.get("metrics", {})
+        }
     }
 
 @app.get("/model-info")

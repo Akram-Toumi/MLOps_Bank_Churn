@@ -206,6 +206,38 @@ pipeline {
             }
         }
         
+        stage('Deploy Model') {
+            when {
+                expression { 
+                    currentBuild.result != 'FAILURE' && 
+                    fileExists('model_promoted.txt') &&
+                    readFile('model_promoted.txt').trim() == 'true'
+                }
+            }
+            steps {
+                bat """
+                    echo ========================================
+                    echo MODEL DEPLOYMENT
+                    echo ========================================
+                    
+                    REM Prepare model for deployment
+                    "${PYTHON}" scripts/deploy_model.py
+                    
+                    REM Trigger Render deployment (if configured)
+                    set RENDER_API_KEY=rnd_ck1tGSoQ8pXa8zsmlEohGF2CVseG
+                    "${PYTHON}" scripts/trigger_render_deploy.py
+                """
+            }
+            post {
+                success {
+                    echo '✅ Model deployed successfully'
+                }
+                failure {
+                    echo '❌ Deployment failed - model is still available locally'
+                }
+            }
+        }
+        
         stage('DVC Versioning') {
             when {
                 expression { currentBuild.result != 'FAILURE' }
