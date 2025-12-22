@@ -9,11 +9,11 @@ pipeline {
     }
     
     stages {
-        stage('Setup') {
+        stage('Preparation') {
             steps {
                 bat """
                     echo ========================================
-                    echo SETUP - PREPARATION
+                    echo PREPARATION - SETUP ET DEPENDENCIES
                     echo ========================================
                     
                     REM Créer les dossiers nécessaires
@@ -37,14 +37,6 @@ pipeline {
                     REM Générer les batches avec transformations
                     "${PYTHON}" scripts/split_dataset.py
                     
-                    echo Setup OK
-                """
-            }
-        }
-        
-        stage('Install Dependencies') {
-            steps {
-                bat """
                     echo ========================================
                     echo INSTALLATION DEPENDENCIES
                     echo ========================================
@@ -52,16 +44,17 @@ pipeline {
                     "${PYTHON}" -m pip install --quiet pytest pytest-html deepchecks
                     "${PYTHON}" -m pip install --quiet xgboost lightgbm catboost
                     "${PYTHON}" -m pip install --quiet dvc
-                    echo Dependencies OK
+                    
+                    echo Preparation OK
                 """
             }
         }
         
-        stage('Generate Production Data') {
+        stage('Simulate New Data') {
             steps {
                 bat """
                     echo ========================================
-                    echo GENERATION DONNEES PRODUCTION
+                    echo SIMULATION NOUVELLES DONNEES
                     echo ========================================
                     "${PYTHON}" scripts/generate_prod_data.py batch1
                 """
@@ -127,7 +120,6 @@ pipeline {
             }
         }
         
-        /*
         stage('Test: Data Distribution') {
             steps {
                 bat """
@@ -143,50 +135,26 @@ pipeline {
                 }
             }
         }
-        */
         
-        /*
-        stage('Check Drift') {
-            steps {
-                script {
-                    if (fileExists('trigger.txt')) {
-                        echo '🚨 DRIFT DETECTED'
-                        env.DRIFT_DETECTED = 'true'
-                    } else {
-                        echo '✓ No drift'
-                        env.DRIFT_DETECTED = 'false'
-                    }
-                }
-            }
-        }
-        */
+    
         
-        stage('Retrain Model') {
-            /*
-            when {
-                expression { env.DRIFT_DETECTED == 'true' }
-            }
-            */
+        stage('Training') {
+            
             steps {
                 bat """
                     echo ========================================
-                    echo RETRAINING - FULL PIPELINE
+                    echo TRAINING - ENTRAINEMENT DES MODELES
                     echo ========================================
                     "${PYTHON}" scripts/retrain_model.py
                 """
             }
         }
         
-        stage('Test: Model Evaluation') {
-            /*
-            when {
-                expression { env.DRIFT_DETECTED == 'true' }
-            }
-            */
+        stage('Evaluation') {
             steps {
                 bat """
                     echo ========================================
-                    echo TEST: MODEL EVALUATION
+                    echo EVALUATION - COMPARAISON DES MODELES
                     echo ========================================
                     "${PYTHON}" -m pytest testing/ -v --html=reports/full_test_report.html --self-contained-html
                 """
@@ -206,14 +174,14 @@ pipeline {
             }
         }
         
-        stage('Deploy Model') {
+        stage('Deployment') {
             when {
                 expression { currentBuild.result != 'FAILURE' }
             }
             steps {
                 bat """
                     echo ========================================
-                    echo MODEL DEPLOYMENT
+                    echo DEPLOYMENT - DEPLOIEMENT DU MODELE
                     echo ========================================
                     "${PYTHON}" scripts/deploy_local.py
                 """
